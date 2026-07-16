@@ -8,6 +8,7 @@
     "android": {
       "package": "com.isanthe.customer",
       "googleServicesFile": "./google-services.json",
+      "usesCleartextTraffic": true,
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
