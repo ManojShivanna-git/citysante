@@ -11,9 +11,6 @@ logs/
 .env.local
 .env.production
 
-# Firebase config (contains API keys)
-**/GoogleService-Info.plist
-**/google-services.json
 
 # Dependencies
 **/node_modules/

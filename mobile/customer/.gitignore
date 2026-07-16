@@ -6,9 +6,6 @@ node_modules/
 dist/
 web-build/
 
-# Firebase config (contains API keys — never commit)
-GoogleService-Info.plist
-google-services.json
 
 # Environment
 .env

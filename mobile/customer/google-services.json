@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "477755975194",
+    "project_id": "isanthe",
+    "storage_bucket": "isanthe.firebasestorage.app"
+  },
+  "configuration_version": "1",
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:477755975194:android:3973394df0c5f0122ad3a3",
+        "android_client_info": {
+          "package_name": "com.isanthe.customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAAlE4_lgxtKDPEm56wbt86kpsNXS05U8g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ]
+}
