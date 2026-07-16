@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CitySante Admin</title>
+    <!-- Google Maps JavaScript API (replaces Leaflet + Leaflet.draw).
+         Key is injected from VITE_GOOGLE_MAPS_API_KEY at build time.
+         Loaded synchronously so window.google is ready when React mounts.
+         The 'drawing' library powers the zone-boundary polygon tool. -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=%VITE_GOOGLE_MAPS_API_KEY%&libraries=drawing"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

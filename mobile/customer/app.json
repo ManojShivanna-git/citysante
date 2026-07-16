@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Isanthe",
+    "slug": "isanthe-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.isanthe.customer",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDomYDJ9arv0ZY4DM-CYChxPTmV82QgBBw"
+        }
+      }
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.isanthe.customer",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "config": {
+        "googleMapsApiKey": "AIzaSyDomYDJ9arv0ZY4DM-CYChxPTmV82QgBBw"
+      }
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#dc2626",
+      "androidMode": "collapse",
+      "androidCollapsedTitle": "Isanthe"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#dc2626",
+          "defaultChannel": "isanthe_orders",
+          "sounds": ["./assets/notification.wav"]
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "8f9fe4bc-53e7-4e8a-8adb-1339e81f0103"
+      }
+    }
+  }
+}

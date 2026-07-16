@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    @apply bg-[#fafaf9] text-gray-900 antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-gray-200 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-gray-300; }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .text-balance { text-wrap: balance; }
+}
+
+/* ── Click / ripple animations ─────────────────────────────────────────────── */
+
+@keyframes ripple-expand {
+  0%   { transform: scale(0);  opacity: 0.55; }
+  100% { transform: scale(28); opacity: 0; }
+}
+
+@keyframes btn-spring {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(0.91); }
+  65%  { transform: scale(1.06); }
+  82%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+@keyframes badge-pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.45); }
+  75%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+@keyframes qty-bump {
+  0%   { transform: translateY(0); }
+  40%  { transform: translateY(-4px); }
+  70%  { transform: translateY(2px); }
+  100% { transform: translateY(0); }
+}
+
+/* Applied via JS: add class, remove after animation ends */
+.animate-ripple   { animation: ripple-expand 0.55s ease-out forwards; }
+.animate-spring   { animation: btn-spring    0.35s cubic-bezier(0.36,0.07,0.19,0.97) both; }
+.animate-badge-pop{ animation: badge-pop     0.35s ease both; }
+.animate-qty-bump { animation: qty-bump      0.28s ease both; }
+
+@layer components {
+  /* ── Buttons ── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold
+           text-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed
+           select-none;
+  }
+  .btn-primary {
+    @apply btn bg-brand-500 text-white hover:bg-brand-600 active:scale-95 shadow-sm
+           shadow-brand-200;
+  }
+  .btn-outline {
+    @apply btn border-2 border-brand-500 text-brand-600 hover:bg-brand-50 active:scale-95;
+  }
+  .btn-ghost {
+    @apply btn text-gray-600 hover:bg-gray-100 active:scale-95;
+  }
+
+  /* ── Cards ── */
+  .card {
+    @apply bg-white rounded-2xl border border-gray-100 shadow-sm;
+  }
+  .card-hover {
+    @apply card transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+  }
+
+  /* ── Inputs ── */
+  .input {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm
+           placeholder:text-gray-400
+           focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent
+           transition-shadow duration-150;
+  }
+  .input-search {
+    @apply input pl-10 bg-gray-50 border-gray-100 focus:bg-white;
+  }
+
+  /* ── Badges ── */
+  .badge        { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold; }
+  .badge-green  { @apply badge bg-green-100 text-green-700; }
+  .badge-red    { @apply badge bg-red-100 text-red-700; }
+  .badge-orange { @apply badge bg-orange-100 text-orange-700; }
+  .badge-yellow { @apply badge bg-yellow-100 text-yellow-700; }
+  .badge-blue   { @apply badge bg-blue-100 text-blue-700; }
+  .badge-gray   { @apply badge bg-gray-100 text-gray-600; }
+
+  /* ── Section heading ── */
+  .section-title {
+    @apply text-lg font-bold text-gray-900 tracking-tight;
+  }
+
+  /* ── Divider ── */
+  .divider { @apply h-px bg-gray-100 my-4; }
+}

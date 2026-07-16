@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Environment files (never commit)
+.env
+.env.local
+.env.production
+
+# Firebase config (contains API keys)
+**/GoogleService-Info.plist
+**/google-services.json
+
+# Dependencies
+**/node_modules/
+
+# Build output
+**/dist/
+**/build/
+**/.expo/
+**/web-build/
+
+# IDE
+.vscode/
+.idea/

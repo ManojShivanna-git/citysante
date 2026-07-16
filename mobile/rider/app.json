@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Isanthe Rider",
+    "slug": "isanthe-rider",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.isanthe.rider",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Isanthe needs your location to update delivery status.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Isanthe needs your location while delivering orders."
+      }
+    },
+    "android": {
+      "package": "com.isanthe.rider",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Isanthe needs location for deliveries."
+        }
+      ],
+      "expo-secure-store",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "8f9fe4bc-53e7-4e8a-8adb-1339e81f0103"
+      }
+    }
+  }
+}
