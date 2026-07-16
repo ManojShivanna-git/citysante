@@ -43,14 +43,17 @@
           "icon": "./assets/notification-icon.png",
           "color": "#dc2626",
           "defaultChannel": "isanthe_orders",
-          "sounds": ["./assets/notification.wav"]
+          "sounds": [
+            "./assets/notification.wav"
+          ]
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "8f9fe4bc-53e7-4e8a-8adb-1339e81f0103"
+        "projectId": "52e16ee2-afa1-48cb-bc91-c44744298a37"
       }
-    }
+    },
+    "owner": "manojss"
   }
 }
