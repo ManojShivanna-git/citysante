@@ -114,10 +114,18 @@ function ProductCard({ item, onPress }: { item: any; onPress: () => void }) {
       </View>
       <TouchableOpacity
         style={styles.addBtn}
-        onPress={() => addItem(item.shop_id, item.shop_name, {
-          id: item.id, product_id: item.product_id, name: item.product_name,
-          price: item.price, discount_price: item.discount_price,
-          image_url: item.image_url, unit: item.unit, unit_value: item.unit_value, stock_qty: 99,
+        onPress={() => addItem({
+          shop_product_id: item.id,
+          product_id: item.product_id,
+          name: item.product_name,
+          price: item.price,
+          discount_price: item.discount_price ?? null,
+          image_url: item.image_url,
+          unit: item.unit,
+          unit_value: item.unit_value,
+          shop_id: item.shop_id,
+          shop_name: item.shop_name,
+          quantity: 1,
         })}
       >
         <Ionicons name="add" size={18} color="#fff" />

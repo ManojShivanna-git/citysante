@@ -37,6 +37,11 @@
       "androidCollapsedTitle": "Isanthe"
     },
     "plugins": [
+      ["expo-build-properties", {
+        "android": {
+          "usesCleartextTraffic": true
+        }
+      }],
       "expo-secure-store",
       [
         "expo-notifications",

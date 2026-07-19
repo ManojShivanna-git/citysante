@@ -1,7 +1,7 @@
 import axios from 'axios'
 import * as SecureStore from 'expo-secure-store'
 
-export const API_BASE = 'http://192.168.0.100:5000/api'
+export const API_BASE = 'https://rebate-canine-chatty.ngrok-free.dev/api'
 
 // Host with no /api suffix — used to resolve relative image paths like
 // "/uploads/products/butter.png" returned by the backend into an absolute
@@ -82,12 +82,21 @@ api.interceptors.response.use(
 
 // ─── Auth ─────────────────────────────────────────────────────────────────
 export const authApi = {
-  login:        (email: string, password: string) => api.post('/auth/login', { email, password }),
+  // Phone OTP (customers)
+  sendOTP:      (phone: string)                        => api.post('/auth/send-otp', { phone }),
+  verifyOTP:    (phone: string, otp: string, name?: string) =>
+    api.post('/auth/verify-otp', { phone, otp, ...(name ? { name } : {}) }),
+  resendOTP:    (phone: string)                        => api.post('/auth/resend-otp', { phone }),
+  // Password (shop owners / riders / admin)
+  login:        (email: string, password: string)      => api.post('/auth/login', { email, password }),
   register:     (name: string, email: string, phone: string, password: string) =>
     api.post('/auth/register', { name, email, phone, password, role: 'customer' }),
-  me:           () => api.get('/auth/me'),
-  logout:       () => api.post('/auth/logout'),
-  saveFcmToken: (fcm_token: string) => api.post('/auth/fcm-token', { fcm_token }),
+  // Shared
+  me:           ()                                     => api.get('/auth/me'),
+  logout:       ()                                     => api.post('/auth/logout'),
+  updateProfile:(data: { name?: string; email?: string; profile_photo_url?: string }) =>
+    api.put('/auth/profile', data),
+  saveFcmToken: (fcm_token: string)                    => api.post('/auth/fcm-token', { fcm_token }),
 }
 
 // ─── Shops ────────────────────────────────────────────────────────────────

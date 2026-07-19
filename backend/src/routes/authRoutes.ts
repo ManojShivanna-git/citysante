@@ -2,16 +2,22 @@ import { Router } from 'express'
 import {
   register, login, refreshToken, logout,
   getMe, updateProfile, changePassword,
-  verifyOTP, resendOTP, saveFcmToken,
+  sendOTP, verifyOTP, resendOTP, saveFcmToken,
 } from '../controllers/authController'
 import { authenticate } from '../middleware/auth'
 
 const router = Router()
 
-router.post('/register',       register)
-router.post('/login',          login)
+// ── Phone OTP auth (customers) ──────────────────────────────────────────
+router.post('/send-otp',       sendOTP)
 router.post('/verify-otp',     verifyOTP)
 router.post('/resend-otp',     resendOTP)
+
+// ── Password auth (shop owners, riders, admin) ──────────────────────────
+router.post('/register',       register)
+router.post('/login',          login)
+
+// ── Shared ──────────────────────────────────────────────────────────────
 router.post('/refresh-token',  refreshToken)
 router.post('/logout',         authenticate, logout)
 router.get ('/me',             authenticate, getMe)

@@ -5,6 +5,7 @@ import { query } from '../config/database'
 import redis, { RedisKeys, TTL } from '../config/redis'
 import { AuthRequest, AuthPayload, UserRole } from '../types'
 import { createError } from '../middleware/errorHandler'
+import { sendOTPSms } from '../services/smsService'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -23,30 +24,120 @@ const generateTokens = (payload: AuthPayload) => {
 const generateOTP = () =>
   Math.floor(100000 + Math.random() * 900000).toString()
 
-// ─── Register ─────────────────────────────────────────────────────────────
+// ─── Send OTP (works for both new + existing customers) ───────────────────
+
+export const sendOTP = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { phone } = req.body
+    if (!phone) throw createError('Phone number is required', 400)
+    if (!/^[6-9]\d{9}$/.test(phone)) throw createError('Enter a valid 10-digit Indian mobile number', 400)
+
+    const otp = generateOTP()
+    await redis.setex(RedisKeys.otp(phone), TTL.OTP, otp)
+    await sendOTPSms(phone, otp)
+
+    // Check if new or existing user
+    const existing = await query('SELECT id FROM users WHERE phone = $1', [phone])
+    const isNewUser = existing.rows.length === 0
+
+    res.json({
+      success: true,
+      message: 'OTP sent successfully',
+      data: { isNewUser },
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ─── Verify OTP — auto login or register customer ─────────────────────────
+
+export const verifyOTP = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { phone, otp, name } = req.body
+    if (!phone || !otp) throw createError('Phone and OTP are required', 400)
+
+    const storedOTP = await redis.get(RedisKeys.otp(phone))
+    if (!storedOTP) throw createError('OTP expired — please request a new one', 400)
+    if (storedOTP !== otp) throw createError('Invalid OTP', 400)
+
+    await redis.del(RedisKeys.otp(phone))
+
+    // Check if user exists
+    let userResult = await query(
+      `SELECT id, name, email, phone, role, is_active, is_verified, profile_photo_url
+       FROM users WHERE phone = $1`,
+      [phone]
+    )
+
+    let isNewUser = false
+
+    if (userResult.rows.length === 0) {
+      // New user — auto-register
+      isNewUser = true
+      const newUser = await query(
+        `INSERT INTO users (name, phone, role, is_verified, is_active)
+         VALUES ($1, $2, 'customer', TRUE, TRUE)
+         RETURNING id, name, email, phone, role, is_active, is_verified, profile_photo_url`,
+        [name || 'Isanthe User', phone]
+      )
+      userResult = newUser
+    } else {
+      // Existing user — mark verified
+      await query('UPDATE users SET is_verified = TRUE, last_login_at = NOW() WHERE phone = $1', [phone])
+    }
+
+    const user = userResult.rows[0]
+
+    if (!user.is_active) throw createError('Account is suspended. Please contact support.', 403)
+    if (user.role !== 'customer') throw createError('Please use the correct app for your role', 403)
+
+    const tokens = generateTokens({ userId: user.id, role: user.role })
+
+    res.json({
+      success: true,
+      message: isNewUser ? 'Account created successfully' : 'Login successful',
+      data: { user, isNewUser, ...tokens },
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ─── Resend OTP ───────────────────────────────────────────────────────────
+
+export const resendOTP = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { phone } = req.body
+    if (!phone) throw createError('Phone number is required', 400)
+
+    const otp = generateOTP()
+    await redis.setex(RedisKeys.otp(phone), TTL.OTP, otp)
+    await sendOTPSms(phone, otp)
+
+    res.json({ success: true, message: 'OTP resent successfully' })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ─── Register (kept for shop_owner / rider — uses email + password) ───────
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, email, phone, password, role = 'customer' } = req.body
 
-    // Validate role — only allow public roles on register
-    const allowedRoles: UserRole[] = ['customer', 'shop_owner', 'rider']
+    const allowedRoles: UserRole[] = ['shop_owner', 'rider']
     if (!allowedRoles.includes(role)) {
-      throw createError('Invalid role for registration', 400)
+      throw createError('Customers register via phone OTP — use /auth/send-otp', 400)
     }
 
-    // Check if phone already exists
     const existingPhone = await query('SELECT id FROM users WHERE phone = $1', [phone])
-    if (existingPhone.rows.length > 0) {
-      throw createError('Phone number already registered', 409)
-    }
+    if (existingPhone.rows.length > 0) throw createError('Phone number already registered', 409)
 
-    // Check if email already exists
     if (email) {
       const existingEmail = await query('SELECT id FROM users WHERE email = $1', [email])
-      if (existingEmail.rows.length > 0) {
-        throw createError('Email already registered', 409)
-      }
+      if (existingEmail.rows.length > 0) throw createError('Email already registered', 409)
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
@@ -60,14 +151,6 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
     const user = result.rows[0]
 
-    // Generate OTP for phone verification
-    const otp = generateOTP()
-    await redis.setex(RedisKeys.otp(phone), TTL.OTP, otp)
-
-    // TODO: Send OTP via SMS (Twilio/MSG91)
-    console.log(`📱 OTP for ${phone}: ${otp}`) // dev only
-
-    // Create rider_duty row if registering as rider
     if (role === 'rider') {
       await query('INSERT INTO rider_duty (rider_id) VALUES ($1)', [user.id])
     }
@@ -76,54 +159,9 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful. Please verify your phone.',
+      message: 'Registration successful',
       data: { user, ...tokens },
     })
-  } catch (err) {
-    next(err)
-  }
-}
-
-// ─── Verify OTP ───────────────────────────────────────────────────────────
-
-export const verifyOTP = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { phone, otp } = req.body
-
-    const storedOTP = await redis.get(RedisKeys.otp(phone))
-    if (!storedOTP) {
-      throw createError('OTP expired — please request a new one', 400)
-    }
-    if (storedOTP !== otp) {
-      throw createError('Invalid OTP', 400)
-    }
-
-    await query('UPDATE users SET is_verified = TRUE WHERE phone = $1', [phone])
-    await redis.del(RedisKeys.otp(phone))
-
-    res.json({ success: true, message: 'Phone verified successfully' })
-  } catch (err) {
-    next(err)
-  }
-}
-
-// ─── Resend OTP ───────────────────────────────────────────────────────────
-
-export const resendOTP = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { phone } = req.body
-
-    const user = await query('SELECT id FROM users WHERE phone = $1', [phone])
-    if (user.rows.length === 0) {
-      throw createError('Phone number not registered', 404)
-    }
-
-    const otp = generateOTP()
-    await redis.setex(RedisKeys.otp(phone), TTL.OTP, otp)
-
-    console.log(`📱 OTP for ${phone}: ${otp}`) // dev only — replace with SMS
-
-    res.json({ success: true, message: 'OTP sent successfully' })
   } catch (err) {
     next(err)
   }

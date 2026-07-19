@@ -7,7 +7,6 @@ import { useAuthStore } from '../store/authStore'
 import { RED } from '../theme'
 
 import LoginScreen        from '../screens/LoginScreen'
-import RegisterScreen     from '../screens/RegisterScreen'
 import HomeScreen         from '../screens/HomeScreen'
 import ShopScreen         from '../screens/ShopScreen'
 import SearchScreen       from '../screens/SearchScreen'
@@ -33,7 +32,6 @@ export type RootStackParamList = {
 
 export type AuthStackParamList = {
   Login: undefined
-  Register: undefined
 }
 
 export type MainTabParamList = {
@@ -50,8 +48,7 @@ const Tab   = createBottomTabNavigator<MainTabParamList>()
 function AuthStack() {
   return (
     <Auth.Navigator screenOptions={{ headerShown: false }}>
-      <Auth.Screen name="Login"    component={LoginScreen} />
-      <Auth.Screen name="Register" component={RegisterScreen} />
+      <Auth.Screen name="Login" component={LoginScreen} />
     </Auth.Navigator>
   )
 }
