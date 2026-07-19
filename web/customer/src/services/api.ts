@@ -23,13 +23,17 @@ api.interceptors.response.use(
 )
 
 export const authApi = {
-  register:  (data: object)            => api.post('/auth/register', data),
-  sendOTP:   (phone: string)           => api.post('/auth/register', { phone }),
-  verifyOTP: (phone: string, otp: string) => api.post('/auth/verify-otp', { phone, otp }),
-  login:     (email: string, password: string) => api.post('/auth/login', { email, password }),
-  me:        ()                        => api.get('/auth/me'),
-  logout:    ()                        => api.post('/auth/logout'),
-  updateProfile: (data: object)        => api.patch('/auth/profile', data),
+  // Phone OTP (customers)
+  sendOTP:      (phone: string)                              => api.post('/auth/send-otp', { phone }),
+  verifyOTP:    (phone: string, otp: string, name?: string) => api.post('/auth/verify-otp', { phone, otp, ...(name ? { name } : {}) }),
+  resendOTP:    (phone: string)                              => api.post('/auth/resend-otp', { phone }),
+  // Password (shop owners / riders)
+  register:     (data: object)                               => api.post('/auth/register', data),
+  login:        (email: string, password: string)            => api.post('/auth/login', { email, password }),
+  // Shared
+  me:           ()                                           => api.get('/auth/me'),
+  logout:       ()                                           => api.post('/auth/logout'),
+  updateProfile:(data: object)                               => api.put('/auth/profile', data),
 }
 
 export const shopApi = {
