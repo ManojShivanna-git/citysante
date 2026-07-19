@@ -5,7 +5,7 @@ import { authApi } from '../../services/api'
 import { ArrowLeft, ArrowRight, Phone, User } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-type Step = 'phone' | 'otp' | 'name'
+type Step = 'phone' | 'otp'
 
 export default function LoginPage() {
   const { loginWithOTP } = useAuthStore()
@@ -46,7 +46,6 @@ export default function LoginPage() {
       startTimer()
       setTimeout(() => otpInputs.current[0]?.focus(), 100)
     } catch {
-      // error toast handled by interceptor
     } finally {
       setLoading(false)
     }
@@ -56,15 +55,12 @@ export default function LoginPage() {
     e.preventDefault()
     const otpStr = otp.join('')
     if (otpStr.length !== 6) { toast.error('Enter the 6-digit OTP'); return }
+    if (isNewUser && !name.trim()) { toast.error('Please enter your name'); return }
     setLoading(true)
     try {
-      const { isNewUser: newUser } = await loginWithOTP(phone.replace(/\D/g, ''), otpStr)
-      if (newUser) {
-        setStep('name')
-      } else {
-        toast.success('Welcome back! 👋')
-        navigate('/')
-      }
+      await loginWithOTP(phone.replace(/\D/g, ''), otpStr, isNewUser ? name.trim() : undefined)
+      toast.success(isNewUser ? 'Welcome to Isanthe! 🎉' : 'Welcome back! 👋')
+      navigate('/')
     } catch {
     } finally {
       setLoading(false)
@@ -80,20 +76,6 @@ export default function LoginPage() {
       otpInputs.current[0]?.focus()
       startTimer()
       toast.success('OTP resent!')
-    } catch {
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSaveName = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) { toast.error('Please enter your name'); return }
-    setLoading(true)
-    try {
-      await authApi.updateProfile({ name: name.trim() })
-      toast.success('Welcome to Isanthe! 🎉')
-      navigate('/')
     } catch {
     } finally {
       setLoading(false)
@@ -147,14 +129,12 @@ export default function LoginPage() {
 
           <div className="mt-12 space-y-4">
             {[
-              { icon: '⚡', title: 'Lightning fast',   sub: '10–30 min delivery' },
-              { icon: '💰', title: 'Best prices',      sub: 'Direct from local shops' },
-              { icon: '📱', title: 'No password',      sub: 'Just your phone number' },
+              { icon: '⚡', title: 'Lightning fast',  sub: '10–30 min delivery' },
+              { icon: '💰', title: 'Best prices',     sub: 'Direct from local shops' },
+              { icon: '📱', title: 'No password',     sub: 'Just your phone number' },
             ].map(({ icon, title, sub }) => (
               <div key={title} className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center text-xl shrink-0">
-                  {icon}
-                </div>
+                <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center text-xl shrink-0">{icon}</div>
                 <div>
                   <p className="font-semibold">{title}</p>
                   <p className="text-white/70 text-sm">{sub}</p>
@@ -176,7 +156,7 @@ export default function LoginPage() {
 
         <div className="w-full max-w-sm">
 
-          {/* ── Step 1: Phone ── */}
+          {/* ── Step 1: Phone number ── */}
           {step === 'phone' && (
             <>
               <h1 className="text-2xl font-extrabold text-gray-900">Enter your mobile number</h1>
@@ -225,7 +205,7 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* ── Step 2: OTP ── */}
+          {/* ── Step 2: OTP (+ name for new users) ── */}
           {step === 'otp' && (
             <>
               <button
@@ -235,47 +215,73 @@ export default function LoginPage() {
                 <ArrowLeft size={16} /> Change number
               </button>
 
-              <div className="text-center mb-8">
+              <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-red-100">
                   📱
                 </div>
-                <h1 className="text-2xl font-extrabold text-gray-900">Enter OTP</h1>
+                <h1 className="text-2xl font-extrabold text-gray-900">
+                  {isNewUser ? 'Verify & create account' : 'Enter OTP'}
+                </h1>
                 <p className="text-gray-500 text-sm mt-2">
-                  Sent to <span className="font-semibold text-gray-700">+91 {phone}</span>
+                  OTP sent to <span className="font-semibold text-gray-700">+91 {phone}</span>
                 </p>
               </div>
 
-              <form onSubmit={handleVerifyOTP} className="space-y-6">
+              <form onSubmit={handleVerifyOTP} className="space-y-5">
                 {/* 6-box OTP input */}
-                <div className="flex gap-2 justify-center" onPaste={handleOtpPaste}>
-                  {otp.map((digit, i) => (
-                    <input
-                      key={i}
-                      ref={(el) => { otpInputs.current[i] = el }}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpInput(e.target.value, i)}
-                      onKeyDown={(e) => handleOtpKey(e, i)}
-                      className={`w-12 h-14 rounded-xl border-2 text-center text-2xl font-bold outline-none transition-all
-                        ${digit
-                          ? 'border-red-500 bg-red-50 text-gray-900'
-                          : 'border-gray-200 bg-white text-gray-900 focus:border-red-400'
-                        }`}
-                    />
-                  ))}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">Enter OTP</label>
+                  <div className="flex gap-2 justify-center" onPaste={handleOtpPaste}>
+                    {otp.map((digit, i) => (
+                      <input
+                        key={i}
+                        ref={(el) => { otpInputs.current[i] = el }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpInput(e.target.value, i)}
+                        onKeyDown={(e) => handleOtpKey(e, i)}
+                        className={`w-12 h-14 rounded-xl border-2 text-center text-2xl font-bold outline-none transition-all
+                          ${digit
+                            ? 'border-red-500 bg-red-50 text-gray-900'
+                            : 'border-gray-200 bg-white text-gray-900 focus:border-red-400'
+                          }`}
+                      />
+                    ))}
+                  </div>
                 </div>
+
+                {/* Name field — only for new users */}
+                {isNewUser && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Your name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        className="input pl-10 w-full"
+                        placeholder="e.g. Ravi Kumar"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required={isNewUser}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">You're creating a new account</p>
+                  </div>
+                )}
 
                 <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-base">
                   {loading ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Verifying…
+                      {isNewUser ? 'Creating account…' : 'Verifying…'}
                     </span>
                   ) : (
                     <span className="flex items-center justify-center gap-2">
-                      Verify OTP <ArrowRight size={16} />
+                      {isNewUser ? 'Create Account' : 'Verify & Login'} <ArrowRight size={16} />
                     </span>
                   )}
                 </button>
@@ -284,6 +290,7 @@ export default function LoginPage() {
               <p className="text-center text-sm text-gray-500 mt-6">
                 Didn't receive it?{' '}
                 <button
+                  type="button"
                   onClick={handleResendOTP}
                   disabled={timer > 0 || loading}
                   className={`font-bold transition-colors ${timer > 0 ? 'text-gray-400 cursor-default' : 'text-red-500 hover:text-red-600'}`}
@@ -291,50 +298,6 @@ export default function LoginPage() {
                   {timer > 0 ? `Resend in ${timer}s` : 'Resend OTP'}
                 </button>
               </p>
-            </>
-          )}
-
-          {/* ── Step 3: Name (new users only) ── */}
-          {step === 'name' && (
-            <>
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-green-100">
-                  🎉
-                </div>
-                <h1 className="text-2xl font-extrabold text-gray-900">Welcome to Isanthe!</h1>
-                <p className="text-gray-500 text-sm mt-2">What should we call you?</p>
-              </div>
-
-              <form onSubmit={handleSaveName} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Your name</label>
-                  <div className="relative">
-                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      className="input pl-10 w-full"
-                      placeholder="e.g. Ravi Kumar"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      autoFocus
-                      required
-                    />
-                  </div>
-                </div>
-
-                <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-base">
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Saving…
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      Start Shopping <ArrowRight size={16} />
-                    </span>
-                  )}
-                </button>
-              </form>
             </>
           )}
 
