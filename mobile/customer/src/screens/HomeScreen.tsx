@@ -1,14 +1,12 @@
 import { useCallback, useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, Image,
 } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
-// expo-location loaded dynamically so the app compiles before the package is installed.
-// Run `npm install expo-location` in mobile/customer once before starting.
-import { shopApi } from '../api/api'
+import { shopApi, productApi, getImageUrl } from '../api/api'
 import { useAuthStore } from '../store/authStore'
 import { useCartStore } from '../store/cartStore'
 import type { Shop } from '../types'
@@ -91,19 +89,57 @@ function ShopCard({ shop, onPress }: { shop: Shop; onPress: () => void }) {
   )
 }
 
+function ProductCard({ item, onPress }: { item: any; onPress: () => void }) {
+  const { addItem } = useCartStore()
+  const imgUrl = getImageUrl(item.image_url)
+  const price = item.discount_price ?? item.price
+  const original = item.discount_price ? item.price : null
+
+  return (
+    <TouchableOpacity style={styles.productCard} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.productImgBox}>
+        {imgUrl
+          ? <Image source={{ uri: imgUrl }} style={styles.productImg} resizeMode="cover" />
+          : <Ionicons name="image-outline" size={32} color="#d1d5db" />
+        }
+      </View>
+      <View style={{ flex: 1, paddingHorizontal: 10 }}>
+        <Text style={styles.productName} numberOfLines={1}>{item.product_name}</Text>
+        <Text style={styles.productShop} numberOfLines={1}>{item.shop_name}</Text>
+        <Text style={styles.productUnit}>{item.unit_value} {item.unit}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+          <Text style={styles.productPrice}>₹{price}</Text>
+          {original && <Text style={styles.productOriginal}>₹{original}</Text>}
+        </View>
+      </View>
+      <TouchableOpacity
+        style={styles.addBtn}
+        onPress={() => addItem(item.shop_id, item.shop_name, {
+          id: item.id, product_id: item.product_id, name: item.product_name,
+          price: item.price, discount_price: item.discount_price,
+          image_url: item.image_url, unit: item.unit, unit_value: item.unit_value, stock_qty: 99,
+        })}
+      >
+        <Ionicons name="add" size={18} color="#fff" />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  )
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>()
   const { user }   = useAuthStore()
   const itemCount  = useCartStore((s) => s.totalItems())
   const cartCount  = useCartStore((s) => s.carts.length)
 
-  const [shops, setShops]       = useState<Shop[]>([])
-  const [loading, setLoading]   = useState(true)
+  const [shops, setShops]         = useState<Shop[]>([])
+  const [products, setProducts]   = useState<any[]>([])
+  const [loading, setLoading]     = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [mode, setMode]         = useState<ShopMode>('fast')
-  const [coords, setCoords]     = useState<{ lat: number; lng: number } | null>(null)
-  const [locLabel, setLocLabel] = useState<string>('')
-  const [locError, setLocError] = useState(false)
+  const [mode, setMode]           = useState<ShopMode>('fast')
+  const [coords, setCoords]       = useState<{ lat: number; lng: number } | null>(null)
+  const [locLabel, setLocLabel]   = useState<string>('')
+  const [locError, setLocError]   = useState(false)
 
   // ── Get GPS location ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -140,28 +176,36 @@ export default function HomeScreen() {
     requestLocation()
   }, [])
 
-  // ── Fetch shops ─────────────────────────────────────────────────────────────
-  const fetchShops = async () => {
+  // ── Fetch data ───────────────────────────────────────────────────────────────
+  const fetchData = async () => {
     const loc = coords ?? { lat: DEFAULT_LAT, lng: DEFAULT_LNG }
     try {
-      const res = await shopApi.getAll({ lat: loc.lat, lng: loc.lng, mode })
-      const raw = res.data.data?.shops || res.data.data || []
-      const parsed = raw.map((s: any) => ({
-        ...s,
-        badges: Array.isArray(s.badges)
-          ? s.badges
-          : typeof s.badges === 'string'
-            ? s.badges.replace(/^\{|\}$/g, '').split(',').filter(Boolean)
-            : [],
-      }))
-      setShops(parsed)
+      if (mode === 'list') {
+        const res = await shopApi.getAll({ lat: loc.lat, lng: loc.lng, mode })
+        const raw = res.data.data?.shops || res.data.data || []
+        const parsed = raw.map((s: any) => ({
+          ...s,
+          badges: Array.isArray(s.badges)
+            ? s.badges
+            : typeof s.badges === 'string'
+              ? s.badges.replace(/^\{|\}$/g, '').split(',').filter(Boolean)
+              : [],
+        }))
+        setShops(parsed)
+        setProducts([])
+      } else {
+        const res = await productApi.browse(loc.lat, loc.lng, { mode: mode === 'fast' ? 'fast' : 'cost', limit: 40 })
+        const raw = res.data.data || []
+        setProducts(raw)
+        setShops([])
+      }
     } catch {}
     finally { setLoading(false); setRefreshing(false) }
   }
 
-  useFocusEffect(useCallback(() => { fetchShops() }, [mode, coords]))
+  useFocusEffect(useCallback(() => { fetchData() }, [mode, coords]))
 
-  const onRefresh = () => { setRefreshing(true); fetchShops() }
+  const onRefresh = () => { setRefreshing(true); fetchData() }
   const activeMode = MODES.find((m) => m.key === mode)!
 
   return (
@@ -262,24 +306,43 @@ export default function HomeScreen() {
             <Text style={styles.modeDesc}>{activeMode.desc}</Text>
           </View>
 
-          {/* Shops section */}
-          <Text style={styles.sectionTitle}>Shops Near You</Text>
+          {/* Section title */}
+          <Text style={styles.sectionTitle}>
+            {mode === 'list' ? 'Shops Near You' : mode === 'fast' ? '⚡ Fast Delivery Products' : '💰 Best Prices Near You'}
+          </Text>
 
           {loading ? (
             <View style={styles.center}><ActivityIndicator color={RED} size="large" /></View>
-          ) : shops.length === 0 ? (
-            <View style={styles.center}>
-              <Ionicons name="storefront-outline" size={48} color="#d1d5db" />
-              <Text style={styles.emptyText}>No shops available</Text>
-            </View>
+          ) : mode === 'list' ? (
+            shops.length === 0 ? (
+              <View style={styles.center}>
+                <Ionicons name="storefront-outline" size={48} color="#d1d5db" />
+                <Text style={styles.emptyText}>No shops available</Text>
+              </View>
+            ) : (
+              shops.map((shop) => (
+                <ShopCard
+                  key={shop.id}
+                  shop={shop}
+                  onPress={() => navigation.navigate('Shop', { shopId: shop.id, shopName: shop.name })}
+                />
+              ))
+            )
           ) : (
-            shops.map((shop) => (
-              <ShopCard
-                key={shop.id}
-                shop={shop}
-                onPress={() => navigation.navigate('Shop', { shopId: shop.id, shopName: shop.name })}
-              />
-            ))
+            products.length === 0 ? (
+              <View style={styles.center}>
+                <Ionicons name="basket-outline" size={48} color="#d1d5db" />
+                <Text style={styles.emptyText}>No products available</Text>
+              </View>
+            ) : (
+              products.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  item={p}
+                  onPress={() => navigation.navigate('Shop', { shopId: p.shop_id, shopName: p.shop_name })}
+                />
+              ))
+            )
           )}
         </View>
       </ScrollView>
@@ -455,6 +518,31 @@ const styles = StyleSheet.create({
 
   center:    { padding: 40, alignItems: 'center' },
   emptyText: { fontSize: 15, color: '#9ca3af', marginTop: 12 },
+
+  // ── Product cards ─────────────────────────────────────────────────────────
+  productCard: {
+    backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10,
+    borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: '#f3f4f6',
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 }, elevation: 2,
+  },
+  productImgBox: {
+    width: 64, height: 64, borderRadius: 12,
+    backgroundColor: '#f9fafb', alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  productImg:      { width: 64, height: 64 },
+  productName:     { fontSize: 14, fontWeight: '700', color: '#111' },
+  productShop:     { fontSize: 12, color: '#6b7280', marginTop: 2 },
+  productUnit:     { fontSize: 11, color: '#9ca3af', marginTop: 1 },
+  productPrice:    { fontSize: 14, fontWeight: '800', color: '#111' },
+  productOriginal: { fontSize: 12, color: '#9ca3af', textDecorationLine: 'line-through' },
+  addBtn: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: RED, alignItems: 'center', justifyContent: 'center',
+    marginLeft: 8,
+  },
 
   // ── Floating cart bar ─────────────────────────────────────────────────────
   cartBar: {
