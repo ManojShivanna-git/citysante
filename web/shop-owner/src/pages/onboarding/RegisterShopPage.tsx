@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Store, MapPin, Phone, Clock, ChevronRight } from 'lucide-react'
 import { shopApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
@@ -6,54 +6,126 @@ import { useAuthStore } from '../../store/authStore'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
+const GMAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY as string
+
 const ZONE_CATEGORIES = [
-  { value: 'grocery',  label: '🛒 Grocery',          desc: 'General groceries & staples' },
-  { value: 'vegetable', label: '🥦 Vegetables & Fruits', desc: 'Fresh produce' },
-  { value: 'dairy',    label: '🥛 Dairy & Bakery',   desc: 'Milk, eggs, bread, baked goods' },
+  { value: 'grocery',   label: '🛒 Grocery',              desc: 'General groceries & staples' },
+  { value: 'vegetable', label: '🥦 Vegetables & Fruits',  desc: 'Fresh produce' },
+  { value: 'dairy',     label: '🥛 Dairy & Bakery',       desc: 'Milk, eggs, bread, baked goods' },
 ]
 
-export default function RegisterShopPage() {
-  const { setShop } = useShopStore()
-  const { logout } = useAuthStore()
-  const navigate = useNavigate()
+// ── Dynamically load the Google Maps JS API ────────────────────────────────
+function loadGoogleMaps(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).google?.maps) { resolve(); return }
+    const existing = document.getElementById('gmaps-script')
+    if (existing) { existing.addEventListener('load', () => resolve()); return }
+    const script = document.createElement('script')
+    script.id  = 'gmaps-script'
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=places`
+    script.async = true
+    script.onload  = () => resolve()
+    script.onerror = () => reject(new Error('Google Maps failed to load'))
+    document.head.appendChild(script)
+  })
+}
 
-  const [step, setStep] = useState(1)
+export default function RegisterShopPage() {
+  const { setShop }  = useShopStore()
+  const { logout }   = useAuthStore()
+  const navigate     = useNavigate()
+  const mapRef       = useRef<HTMLDivElement>(null)
+  const mapObj       = useRef<google.maps.Map | null>(null)
+  const markerRef    = useRef<google.maps.Marker | null>(null)
+
+  const [step, setStep]   = useState(1)
   const [saving, setSaving] = useState(false)
+  const [mapsReady, setMapsReady] = useState(!!(window as any).google?.maps)
   const [form, setForm] = useState({
-    name: '',
-    description: '',
-    phone: '',
-    address: '',
-    city: '',
-    state: '',
-    pincode: '',
-    lat: '',
-    lng: '',
+    name: '', description: '', phone: '',
+    address: '', city: '', state: '', pincode: '',
+    lat: '', lng: '',
     zone_category: 'grocery',
-    delivery_fee: '0',
-    minimum_order: '0',
-    delivery_time_min: '20',
-    delivery_time_max: '45',
+    delivery_fee: '0', minimum_order: '0',
+    delivery_time_min: '20', delivery_time_max: '45',
   })
 
   const set = (field: string, value: string) =>
     setForm((f) => ({ ...f, [field]: value }))
 
+  // Load Google Maps when user reaches step 2
+  useEffect(() => {
+    if (step !== 2 || mapsReady) return
+    loadGoogleMaps()
+      .then(() => setMapsReady(true))
+      .catch(() => toast.error('Could not load Google Maps'))
+  }, [step, mapsReady])
+
+  // Init map once Maps API is ready and div is rendered
+  useEffect(() => {
+    if (step !== 2 || !mapsReady || !mapRef.current || mapObj.current) return
+
+    const defaultCenter = { lat: 12.9716, lng: 77.5946 } // Bangalore
+    const map = new google.maps.Map(mapRef.current, {
+      center: defaultCenter,
+      zoom: 14,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+    })
+    mapObj.current = map
+
+    // Click to place marker
+    map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (!e.latLng) return
+      const lat = e.latLng.lat().toFixed(6)
+      const lng = e.latLng.lng().toFixed(6)
+      set('lat', lat)
+      set('lng', lng)
+
+      if (markerRef.current) {
+        markerRef.current.setPosition(e.latLng)
+      } else {
+        markerRef.current = new google.maps.Marker({
+          position: e.latLng,
+          map,
+          title: 'Your shop location',
+          animation: google.maps.Animation.DROP,
+        })
+      }
+    })
+
+    // Try to center on user's current location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          map.setCenter(loc)
+          map.setZoom(16)
+        },
+        () => {} // silently ignore
+      )
+    }
+  }, [step, mapsReady])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.lat || !form.lng) {
+      toast.error('Please tap your shop location on the map')
+      return
+    }
     setSaving(true)
     try {
       const payload = {
         ...form,
-        lat: form.lat ? parseFloat(form.lat) : null,
-        lng: form.lng ? parseFloat(form.lng) : null,
-        delivery_fee: parseFloat(form.delivery_fee) || 0,
-        minimum_order: parseFloat(form.minimum_order) || 0,
-        delivery_time_min: parseInt(form.delivery_time_min) || 20,
-        delivery_time_max: parseInt(form.delivery_time_max) || 45,
+        lat: parseFloat(form.lat),
+        lng: parseFloat(form.lng),
+        delivery_fee:      parseFloat(form.delivery_fee)      || 0,
+        minimum_order:     parseFloat(form.minimum_order)     || 0,
+        delivery_time_min: parseInt(form.delivery_time_min)   || 20,
+        delivery_time_max: parseInt(form.delivery_time_max)   || 45,
       }
       const res = await shopApi.registerShop(payload)
-      // The shop is now pending admin approval — store it so App knows we have one
       setShop(res.data.data)
       toast.success('Shop registered! Waiting for admin approval.')
       navigate('/dashboard')
@@ -91,6 +163,7 @@ export default function RegisterShopPage() {
         </div>
 
         <div className="card p-6">
+          {/* ── Step 1: Basic Info ─────────────────────────────────── */}
           {step === 1 && (
             <div className="space-y-4">
               <h2 className="font-semibold text-gray-800 flex items-center gap-2">
@@ -151,6 +224,7 @@ export default function RegisterShopPage() {
             </div>
           )}
 
+          {/* ── Step 2: Location & Delivery ───────────────────────── */}
           {step === 2 && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <h2 className="font-semibold text-gray-800 flex items-center gap-2">
@@ -182,20 +256,34 @@ export default function RegisterShopPage() {
                   value={form.pincode} onChange={(e) => set('pincode', e.target.value)} />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Latitude (optional)</label>
-                  <input className="input" placeholder="12.9352"
-                    value={form.lat} onChange={(e) => set('lat', e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Longitude (optional)</label>
-                  <input className="input" placeholder="77.6244"
-                    value={form.lng} onChange={(e) => set('lng', e.target.value)} />
-                </div>
+              {/* Map picker */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                  <MapPin size={13} className="text-brand-600" />
+                  Tap your shop location on the map *
+                </label>
+                <div
+                  ref={mapRef}
+                  className="w-full rounded-xl overflow-hidden border border-gray-200"
+                  style={{ height: 280 }}
+                />
+                {!mapsReady && (
+                  <div className="flex items-center justify-center h-40 bg-gray-100 rounded-xl">
+                    <div className="w-6 h-6 border-3 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+                {form.lat && form.lng ? (
+                  <p className="text-xs text-green-600 mt-1">
+                    ✓ Location set: {form.lat}, {form.lng}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Click anywhere on the map to pin your exact shop location.
+                  </p>
+                )}
               </div>
-              <p className="text-xs text-gray-400 -mt-2">You can get coordinates from Google Maps. Isanthe team can also set this for you.</p>
 
+              {/* Delivery settings */}
               <div className="border-t border-gray-100 pt-4">
                 <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-1">
                   <Clock size={14} /> Delivery Settings
