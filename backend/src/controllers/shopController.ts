@@ -224,12 +224,12 @@ export const updateShop = async (req: AuthRequest, res: Response, next: NextFunc
 
 export const toggleShopOpen = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const shopId = req.user?.shopId
+    // Use owner_id so this works even if shopId wasn't in the JWT (e.g. shop created after login)
     const result = await query(
       `UPDATE shops SET is_open = NOT is_open, updated_at = NOW()
-       WHERE id = $1 AND owner_id = $2
+       WHERE owner_id = $1
        RETURNING id, is_open`,
-      [shopId, req.user?.userId]
+      [req.user?.userId]
     )
     if (result.rows.length === 0) throw createError('Shop not found', 404)
     const { is_open } = result.rows[0]
