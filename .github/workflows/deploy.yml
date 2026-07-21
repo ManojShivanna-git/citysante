@@ -1,0 +1,89 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_all:
+        description: 'Force rebuild all apps'
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    name: Deploy to GCP VM
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_VM_IP }}
+          username: ${{ secrets.GCP_VM_USER }}
+          key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
+          command_timeout: 20m
+          envs: FORCE_ALL
+          script: |
+            set -e
+            cd /var/www/isanthe
+
+            # Pull latest and detect what changed
+            git fetch origin main
+            PREV=$(git rev-parse HEAD)
+            git pull origin main
+            CURR=$(git rev-parse HEAD)
+
+            if [ "$PREV" = "$CURR" ] && [ "$FORCE_ALL" != "true" ]; then
+              echo "Already up to date — nothing to deploy"
+              exit 0
+            fi
+
+            CHANGED=$(git diff --name-only "$PREV" "$CURR" 2>/dev/null || echo "ALL")
+            echo "Changed: $CHANGED"
+
+            should_deploy() {
+              [ "$FORCE_ALL" = "true" ] || echo "$CHANGED" | grep -q "^$1"
+            }
+
+            # ── Backend ──────────────────────────────────────────────────
+            if should_deploy "backend/"; then
+              echo "=== Backend ==="
+              cd /var/www/isanthe/backend
+              npm ci
+              npm run build
+              pm2 restart isanthe-api
+              echo "✓ API restarted"
+            fi
+
+            # ── Customer Web ─────────────────────────────────────────────
+            if should_deploy "web/customer/"; then
+              echo "=== Customer Web ==="
+              cd /var/www/isanthe/web/customer
+              npm ci
+              npm run build
+              echo "✓ Customer web rebuilt"
+            fi
+
+            # ── Shop Owner Web ───────────────────────────────────────────
+            if should_deploy "web/shop-owner/"; then
+              echo "=== Shop Owner Web ==="
+              cd /var/www/isanthe/web/shop-owner
+              npm ci
+              npm run build
+              echo "✓ Shop owner web rebuilt"
+            fi
+
+            # ── Admin Web ────────────────────────────────────────────────
+            if should_deploy "web/admin/"; then
+              echo "=== Admin Web ==="
+              cd /var/www/isanthe/web/admin
+              npm ci
+              npm run build
+              echo "✓ Admin web rebuilt"
+            fi
+
+            echo "✅ Deploy complete — $PREV → $CURR"
+        env:
+          FORCE_ALL: ${{ github.event.inputs.force_all || 'false' }}
