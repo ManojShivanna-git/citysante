@@ -1,0 +1,112 @@
+name: EAS Build — Android APKs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Which app to build'
+        required: true
+        default: 'all'
+        type: choice
+        options: [all, customer, rider, shop-owner]
+
+jobs:
+  # ── Customer App ─────────────────────────────────────────────────────────
+  build-customer:
+    name: Customer App (Android)
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' && (inputs.app == 'all' || inputs.app == 'customer') ||
+      github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/customer/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile/customer
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build APK
+        working-directory: mobile/customer
+        run: eas build --platform android --profile preview --non-interactive --no-wait
+
+  # ── Rider App ─────────────────────────────────────────────────────────────
+  build-rider:
+    name: Rider App (Android)
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' && (inputs.app == 'all' || inputs.app == 'rider') ||
+      github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/rider/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile/rider
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build APK
+        working-directory: mobile/rider
+        run: eas build --platform android --profile preview --non-interactive --no-wait
+
+  # ── Shop Owner App ────────────────────────────────────────────────────────
+  build-shop-owner:
+    name: Shop Owner App (Android)
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' && (inputs.app == 'all' || inputs.app == 'shop-owner') ||
+      github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/shop-owner/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile/shop-owner
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build APK
+        working-directory: mobile/shop-owner
+        run: eas build --platform android --profile preview --non-interactive --no-wait

@@ -1,0 +1,93 @@
+name: Deploy Web Apps — Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+  workflow_dispatch:
+
+jobs:
+  # ── Customer Web App ──────────────────────────────────────────────────────
+  deploy-customer:
+    name: Customer Web → Firebase
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/customer/package-lock.json
+
+      - name: Install & Build
+        working-directory: web/customer
+        run: npm ci && npm run build
+        env:
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+
+      - name: Deploy to Firebase
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: isanthe
+          target: customer
+          entryPoint: web/customer
+
+  # ── Shop Owner Web App ────────────────────────────────────────────────────
+  deploy-shop-owner:
+    name: Shop Owner Web → Firebase
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/shop-owner/package-lock.json
+
+      - name: Install & Build
+        working-directory: web/shop-owner
+        run: npm ci && npm run build
+        env:
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+
+      - name: Deploy to Firebase
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: isanthe
+          target: shop-owner
+          entryPoint: web/shop-owner
+
+  # ── Admin Panel ───────────────────────────────────────────────────────────
+  deploy-admin:
+    name: Admin Panel → Firebase
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/admin/package-lock.json
+
+      - name: Install & Build
+        working-directory: web/admin
+        run: npm ci && npm run build
+        env:
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+
+      - name: Deploy to Firebase
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: isanthe
+          target: admin
+          entryPoint: web/admin

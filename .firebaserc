@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "isanthe"
+  },
+  "targets": {
+    "isanthe": {
+      "hosting": {
+        "customer":   ["isanthe-customer"],
+        "shop-owner": ["isanthe-shop-owner"],
+        "admin":      ["isanthe-admin"]
+      }
+    }
+  }
+}

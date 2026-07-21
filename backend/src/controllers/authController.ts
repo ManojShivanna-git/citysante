@@ -58,6 +58,7 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
     if (!phone || !otp) throw createError('Phone and OTP are required', 400)
 
     const storedOTP = await redis.get(RedisKeys.otp(phone))
+    console.log(`🔍 verify-otp | phone="${phone}" submitted="${otp}" stored="${storedOTP}"`)
     if (!storedOTP) throw createError('OTP expired — please request a new one', 400)
     if (storedOTP !== otp) throw createError('Invalid OTP', 400)
 
