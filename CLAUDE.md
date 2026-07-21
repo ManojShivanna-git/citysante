@@ -331,11 +331,59 @@ field_agents       - field agent assignments and zones (Phase 2)
 ## 16. Current Session Status
 
 - All Phase 1 features complete ✅
-- All pre-launch UX gaps fixed ✅ (July 2026):
-  - Shop owner onboarding: `RegisterShopPage.tsx` shown when no shop exists; 2-step form submits to `POST /shops`
-  - Add rider by phone: `lookupRiderByPhone` backend endpoint + lookup+confirm UI flow
-  - Customer saved addresses: `addressApi` wired to `/users/addresses`, checkout picks from saved addresses, new `AddressPage.tsx` at `/profile/addresses`
+- All pre-launch UX gaps fixed ✅ (July 2026)
+- **Production server live** ✅ (July 2026) — see Section 19
 - Only remaining task: **Testing + soft launch** (Step 10)
+
+---
+
+## 19. Production Infrastructure
+
+### Server
+| Item | Value |
+|---|---|
+| Provider | GCP Compute Engine (e2-medium) |
+| Region | asia-south1 (Mumbai) |
+| OS | Ubuntu 22.04 LTS |
+| IP | 34.47.224.253 |
+| App path | `/var/www/isanthe/` |
+| Process manager | PM2 (`isanthe-api`) |
+| Web server | Nginx |
+
+### Live URLs
+| URL | What |
+|---|---|
+| https://api.isanthe.com | Backend API |
+| https://isanthe.com | Customer web app |
+| https://shop.isanthe.com | Shop owner dashboard |
+| https://admin.isanthe.com | Admin panel |
+
+### DNS
+- All domains managed on **Cloudflare** (proxy enabled)
+- SSL via **Let's Encrypt** (Certbot, auto-renews)
+
+### Database on VM
+- PostgreSQL 14 — DB: `citysante`, user: `isanthe`
+- Redis 6 — localhost:6379
+- Migrations run: `npm run migrate` in `/var/www/isanthe/backend`
+
+### Deployment
+- **Backend**: SSH → `git pull` → `npm ci` → `npm run build` → `pm2 restart isanthe-api`
+- **Web apps**: `git pull` → `npm run build` in each web app folder, Nginx serves `dist/`
+- **Mobile apps**: EAS Build (Expo) — trigger via GitHub Actions or manually
+
+### Web app env vars (on VM at `/var/www/isanthe/web/<app>/.env`)
+```
+VITE_API_URL=https://api.isanthe.com/api
+VITE_GOOGLE_MAPS_KEY=AIzaSyDomYDJ9arv0ZY4DM-CYChxPTmV82QgBBw
+# admin also has:
+VITE_GOOGLE_MAPS_API_KEY=AIzaSyDomYDJ9arv0ZY4DM-CYChxPTmV82QgBBw
+```
+
+### Pending
+- [ ] GitHub Secrets for CI/CD (GCP_VM_IP, GCP_VM_USER, GCP_SSH_PRIVATE_KEY, EXPO_TOKEN, FIREBASE_SERVICE_ACCOUNT, VITE_GOOGLE_MAPS_API_KEY)
+- [ ] Fast2SMS website verification (OTP currently logs to console in dev mode)
+- [ ] End-to-end testing before soft launch
 
 ---
 
@@ -382,3 +430,4 @@ CitySante is NOT just a grocery app. It is a **multi-service local platform**.
 | June 2026 | Zone boundary stored as a JSON-stringified array of `{lat, lng}` points in the existing `zones.boundary` TEXT column — no PostGIS geometry type, since Phase 1 only needs to redraw/display the polygon, not run spatial queries against it |
 | July 2026 | Google Maps API key configured — admin zone drawing + shop detail map + zone shops map switched from Leaflet/OSM to Google Maps JS API (+ Drawing library). Key in `backend/.env` (GOOGLE_MAPS_API_KEY) and `web/admin/.env` (VITE_GOOGLE_MAPS_API_KEY). Restart `npm run dev` in web/admin after adding the .env file. |
 | July 2026 | App renamed from CitySante → **Isanthe**. Bundle IDs updated: `com.isanthe.customer`, `com.isanthe.rider`, `com.isanthe.shopowner`. Firebase project ID remains `isanthe`. |
+| July 2026 | Production deployed to GCP VM (34.47.224.253, Mumbai). All 4 domains live with SSL. PM2 + Nginx. Mobile apps updated to api.isanthe.com. |
