@@ -2,7 +2,7 @@ import axios from 'axios'
 import * as SecureStore from 'expo-secure-store'
 
 // ─── Change this to your Mac's local IP when testing on a physical device
-export const API_BASE = 'http://192.168.0.100:5000/api'
+export const API_BASE = 'https://api.isanthe.com/api'
 // Socket.IO root (no /api suffix)
 export const SOCKET_BASE = API_BASE.replace(/\/api\/?$/, '')
 

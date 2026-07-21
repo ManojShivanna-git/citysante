@@ -1,7 +1,7 @@
 import axios from 'axios'
 import * as SecureStore from 'expo-secure-store'
 
-export const API_BASE = 'http://192.168.0.100:5000/api'
+export const API_BASE = 'https://api.isanthe.com/api'
 
 // Host with no /api suffix — used to resolve relative image paths like
 // "/uploads/products/butter.png" returned by the backend into an absolute
