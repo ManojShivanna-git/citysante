@@ -35,8 +35,10 @@ export default function RegisterShopPage() {
   const { logout }   = useAuthStore()
   const navigate     = useNavigate()
   const mapRef       = useRef<HTMLDivElement>(null)
-  const mapObj       = useRef<google.maps.Map | null>(null)
-  const markerRef    = useRef<google.maps.Marker | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapObj       = useRef<any>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const markerRef    = useRef<any>(null)
 
   const [step, setStep]   = useState(1)
   const [saving, setSaving] = useState(false)
@@ -65,8 +67,10 @@ export default function RegisterShopPage() {
   useEffect(() => {
     if (step !== 2 || !mapsReady || !mapRef.current || mapObj.current) return
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G = (window as any).google
     const defaultCenter = { lat: 12.9716, lng: 77.5946 } // Bangalore
-    const map = new google.maps.Map(mapRef.current, {
+    const map = new G.maps.Map(mapRef.current, {
       center: defaultCenter,
       zoom: 14,
       mapTypeControl: false,
@@ -76,7 +80,7 @@ export default function RegisterShopPage() {
     mapObj.current = map
 
     // Click to place marker
-    map.addListener('click', (e: google.maps.MapMouseEvent) => {
+    map.addListener('click', (e: any) => {
       if (!e.latLng) return
       const lat = e.latLng.lat().toFixed(6)
       const lng = e.latLng.lng().toFixed(6)
@@ -86,11 +90,11 @@ export default function RegisterShopPage() {
       if (markerRef.current) {
         markerRef.current.setPosition(e.latLng)
       } else {
-        markerRef.current = new google.maps.Marker({
+        markerRef.current = new G.maps.Marker({
           position: e.latLng,
           map,
           title: 'Your shop location',
-          animation: google.maps.Animation.DROP,
+          animation: G.maps.Animation.DROP,
         })
       }
     })
