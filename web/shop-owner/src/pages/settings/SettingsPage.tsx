@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
-import { Save } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Camera, Save, Store } from 'lucide-react'
 import { shopApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
 import toast from 'react-hot-toast'
+
+const API = import.meta.env.VITE_API_URL?.replace('/api', '') || ''
 
 export default function SettingsPage() {
   const { shop, setShop } = useShopStore()
@@ -13,6 +15,25 @@ export default function SettingsPage() {
     open_time: '', close_time: '',
   })
   const [saving, setSaving] = useState(false)
+  const [uploadingLogo,  setUploadingLogo]  = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const logoRef  = useRef<HTMLInputElement>(null)
+  const coverRef = useRef<HTMLInputElement>(null)
+
+  const handleImageUpload = async (file: File, type: 'logo' | 'cover') => {
+    if (type === 'logo')  setUploadingLogo(true)
+    else                  setUploadingCover(true)
+    try {
+      const res = await shopApi.uploadImage(file, type)
+      setShop({ ...shop!, ...res.data.data })
+      toast.success(`${type === 'logo' ? 'Logo' : 'Cover'} updated`)
+    } catch {
+      // error shown by interceptor
+    } finally {
+      if (type === 'logo')  setUploadingLogo(false)
+      else                  setUploadingCover(false)
+    }
+  }
 
   useEffect(() => {
     if (shop) {
@@ -77,6 +98,57 @@ export default function SettingsPage() {
           ⚠️ Your shop status is <strong>{shop?.status}</strong>. Contact admin if you believe this is an error.
         </div>
       )}
+
+      {/* ── Shop Images ─────────────────────────────────────────── */}
+      <div className="card overflow-hidden">
+        {/* Cover image */}
+        <div
+          className="relative h-36 bg-gradient-to-r from-brand-500 to-brand-700 cursor-pointer group"
+          style={shop?.cover_url ? {
+            backgroundImage: `url(${API}${shop.cover_url})`,
+            backgroundSize: 'cover', backgroundPosition: 'center',
+          } : {}}
+          onClick={() => coverRef.current?.click()}
+        >
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 bg-black/60 text-white text-sm font-medium px-4 py-2 rounded-full">
+              {uploadingCover
+                ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : <Camera size={15} />}
+              {uploadingCover ? 'Uploading…' : 'Change cover photo'}
+            </div>
+          </div>
+        </div>
+
+        {/* Logo */}
+        <div className="px-5 pb-4 flex items-end gap-4 -mt-10">
+          <div
+            className="relative w-20 h-20 rounded-2xl border-4 border-white shadow-md bg-brand-100 flex items-center justify-center cursor-pointer group flex-shrink-0 overflow-hidden"
+            onClick={() => logoRef.current?.click()}
+          >
+            {shop?.logo_url
+              ? <img src={`${API}${shop.logo_url}`} alt="Logo" className="w-full h-full object-cover" />
+              : <Store size={28} className="text-brand-400" />}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                {uploadingLogo
+                  ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin block" />
+                  : <Camera size={16} className="text-white" />}
+              </div>
+            </div>
+          </div>
+          <div className="pb-1">
+            <p className="text-xs text-gray-400">Click logo or cover to upload a new image</p>
+            <p className="text-xs text-gray-400">PNG, JPG or WEBP · max 5 MB</p>
+          </div>
+        </div>
+
+        {/* Hidden file inputs */}
+        <input ref={logoRef}  type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, 'logo');  e.target.value = '' }} />
+        <input ref={coverRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, 'cover'); e.target.value = '' }} />
+      </div>
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Basic info */}

@@ -19,7 +19,8 @@ import { AuthRequest } from '../types'
 // static file server in index.ts (`/uploads`) already serves, and the same
 // folder seed.ts / the generated placeholder images live in.
 
-export function resolveUploadType(req: AuthRequest): 'products' | 'categories' | 'requests' {
+export function resolveUploadType(req: AuthRequest): 'products' | 'categories' | 'requests' | 'shops' {
+  if (req.query.type === 'shops') return 'shops'
   if (req.user?.role === 'shop_owner') return 'requests'
   if (req.query.type === 'categories') return 'categories'
   if (req.query.type === 'requests') return 'requests'

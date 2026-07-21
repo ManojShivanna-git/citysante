@@ -34,6 +34,13 @@ export const shopApi = {
   registerShop: (data: object) => api.post('/shops', data),
   updateShop: (id: string, data: object) => api.put(`/shops/${id}`, data),
   toggleOpen: () => api.patch('/shops/toggle-open'),
+  uploadImage: (file: File, type: 'logo' | 'cover') => {
+    const formData = new FormData()
+    formData.append('image', file)
+    return api.post(`/shops/upload-image?type=${type}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }
 
 export const billingApi = {

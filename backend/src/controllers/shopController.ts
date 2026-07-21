@@ -239,6 +239,29 @@ export const toggleShopOpen = async (req: AuthRequest, res: Response, next: Next
   }
 }
 
+// ─── Upload Shop Image (logo or cover) ───────────────────────────────────
+
+export const uploadShopImage = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) throw createError('No image file provided', 400)
+    const imageType = req.query.type === 'cover' ? 'cover' : 'logo'
+    const field = imageType === 'cover' ? 'cover_url' : 'logo_url'
+    const image_url = `/uploads/shops/${req.file.filename}`
+
+    const result = await query(
+      `UPDATE shops SET ${field} = $1, updated_at = NOW()
+       WHERE owner_id = $2
+       RETURNING id, logo_url, cover_url`,
+      [image_url, req.user?.userId]
+    )
+    if (result.rows.length === 0) throw createError('Shop not found', 404)
+
+    res.json({ success: true, message: 'Image uploaded', data: { image_url, ...result.rows[0] } })
+  } catch (err) {
+    next(err)
+  }
+}
+
 // ─── Get My Shop ──────────────────────────────────────────────────────────
 
 export const getMyShop = async (req: AuthRequest, res: Response, next: NextFunction) => {
