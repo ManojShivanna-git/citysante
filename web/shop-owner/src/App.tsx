@@ -7,6 +7,7 @@ import { connectSocket } from './services/socketService'
 
 import Layout             from './components/Layout'
 import LoginPage          from './pages/auth/LoginPage'
+import RegisterPage       from './pages/auth/RegisterPage'
 import DashboardPage      from './pages/dashboard/DashboardPage'
 import OrdersPage         from './pages/orders/OrdersPage'
 import ProductsPage       from './pages/products/ProductsPage'
@@ -56,7 +57,8 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+      <Route path="/login"    element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+      <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
 
       {/* Onboarding — auth required, but no shop yet */}
       <Route path="/register-shop" element={

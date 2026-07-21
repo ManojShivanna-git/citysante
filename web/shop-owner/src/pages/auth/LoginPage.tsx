@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 
@@ -46,6 +46,11 @@ export default function LoginPage() {
             className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg text-sm transition-colors disabled:opacity-50">
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
+
+          <p className="text-center text-sm text-gray-400">
+            New shop owner?{' '}
+            <Link to="/register" className="text-brand-400 hover:underline">Create an account</Link>
+          </p>
         </form>
       </div>
     </div>
