@@ -46,7 +46,10 @@ export const adminApi = {
   getShopOrders: (id: string, params?: Record<string, string>) =>
     api.get(`/admin/shops/${id}/orders`, { params }),
   reviewShop: (id: string, status: 'active' | 'rejected', note?: string) =>
-    api.patch(`/admin/shops/${id}/review`, { status, note }),
+    api.patch(`/admin/shops/${id}/review`, {
+      action: status === 'active' ? 'approve' : 'reject',
+      reason: note,
+    }),
   suspendShop: (id: string, reason: string) =>
     api.patch(`/admin/shops/${id}/suspend`, { reason }),
   reactivateShop: (id: string) =>
