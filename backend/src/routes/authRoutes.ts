@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import rateLimit from 'express-rate-limit'
 import {
   register, login, refreshToken, logout,
   getMe, updateProfile, changePassword,
@@ -9,21 +10,49 @@ import { authenticate } from '../middleware/auth'
 
 const router = Router()
 
-// ── Firebase Phone Auth (customers) ─────────────────────────────────────
-router.post('/firebase-phone', firebasePhoneLogin)
+// ── Rate limiters ────────────────────────────────────────────────────────
+// OTP send: max 5 requests per 15 min per IP
+const otpSendLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Too many OTP requests. Try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
-// ── Legacy OTP auth (kept as fallback) ──────────────────────────────────
-router.post('/send-otp',       sendOTP)
-router.post('/verify-otp',     verifyOTP)
-router.post('/resend-otp',     resendOTP)
+// OTP verify: max 10 attempts per 15 min per IP
+const otpVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { success: false, message: 'Too many attempts. Try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+// Login: max 10 attempts per 15 min per IP
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+// ── Firebase Phone Auth (customers) ─────────────────────────────────────
+router.post('/firebase-phone', otpSendLimiter, firebasePhoneLogin)
+
+// ── Phone OTP auth ───────────────────────────────────────────────────────
+router.post('/send-otp',       otpSendLimiter,   sendOTP)
+router.post('/verify-otp',     otpVerifyLimiter, verifyOTP)
+router.post('/resend-otp',     otpSendLimiter,   resendOTP)
 
 // ── Email OTP auth (all roles) ───────────────────────────────────────────
-router.post('/send-email-otp',   sendEmailOTP)
-router.post('/verify-email-otp', verifyEmailOTP)
+router.post('/send-email-otp',   otpSendLimiter,   sendEmailOTP)
+router.post('/verify-email-otp', otpVerifyLimiter, verifyEmailOTP)
 
 // ── Password auth (shop owners, riders, admin) ──────────────────────────
 router.post('/register',       register)
-router.post('/login',          login)
+router.post('/login',          loginLimiter, login)
 
 // ── Shared ──────────────────────────────────────────────────────────────
 router.post('/refresh-token',  refreshToken)
