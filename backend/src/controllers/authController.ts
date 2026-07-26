@@ -105,6 +105,61 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
   }
 }
 
+// ─── Firebase Phone Auth Login ────────────────────────────────────────────
+// Client verifies OTP with Firebase, sends us the ID token.
+// We verify it with Firebase Admin, then issue our own JWT.
+
+export const firebasePhoneLogin = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { idToken, name } = req.body
+    if (!idToken) throw createError('Firebase ID token is required', 400)
+
+    // Verify token with Firebase Admin
+    const admin = (await import('../config/firebase')).default
+    const decoded = await admin.auth().verifyIdToken(idToken)
+    const firebasePhone = decoded.phone_number   // e.g. "+919876543210"
+    if (!firebasePhone) throw createError('Phone number not found in Firebase token', 400)
+
+    // Strip +91 country code → 10-digit local number stored in DB
+    const phone = firebasePhone.replace(/^\+91/, '')
+
+    // Find or create customer
+    let userResult = await query(
+      `SELECT id, name, email, phone, role, is_active, is_verified, profile_photo_url
+       FROM users WHERE phone = $1`,
+      [phone]
+    )
+
+    let isNewUser = false
+    if (userResult.rows.length === 0) {
+      isNewUser = true
+      const newUser = await query(
+        `INSERT INTO users (name, phone, role, is_verified, is_active)
+         VALUES ($1, $2, 'customer', TRUE, TRUE)
+         RETURNING id, name, email, phone, role, is_active, is_verified, profile_photo_url`,
+        [name?.trim() || 'Isanthe User', phone]
+      )
+      userResult = newUser
+    } else {
+      await query('UPDATE users SET is_verified = TRUE, last_login_at = NOW() WHERE phone = $1', [phone])
+    }
+
+    const user = userResult.rows[0]
+    if (!user.is_active) throw createError('Account suspended. Contact support.', 403)
+    if (user.role !== 'customer') throw createError('Please use the correct app for your role', 403)
+
+    const tokens = generateTokens({ userId: user.id, role: user.role })
+
+    res.json({
+      success: true,
+      message: isNewUser ? 'Account created successfully' : 'Login successful',
+      data: { user, isNewUser, ...tokens },
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
 // ─── Resend OTP ───────────────────────────────────────────────────────────
 
 export const resendOTP = async (req: Request, res: Response, next: NextFunction) => {

@@ -2,13 +2,16 @@ import { Router } from 'express'
 import {
   register, login, refreshToken, logout,
   getMe, updateProfile, changePassword,
-  sendOTP, verifyOTP, resendOTP, saveFcmToken,
+  sendOTP, verifyOTP, resendOTP, saveFcmToken, firebasePhoneLogin,
 } from '../controllers/authController'
 import { authenticate } from '../middleware/auth'
 
 const router = Router()
 
-// ── Phone OTP auth (customers) ──────────────────────────────────────────
+// ── Firebase Phone Auth (customers) ─────────────────────────────────────
+router.post('/firebase-phone', firebasePhoneLogin)
+
+// ── Legacy OTP auth (kept as fallback) ──────────────────────────────────
 router.post('/send-otp',       sendOTP)
 router.post('/verify-otp',     verifyOTP)
 router.post('/resend-otp',     resendOTP)

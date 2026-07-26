@@ -83,6 +83,9 @@ api.interceptors.response.use(
 // ─── Auth ─────────────────────────────────────────────────────────────────
 export const authApi = {
   // Phone OTP (customers)
+  firebaseLogin: (idToken: string, name?: string) =>
+    api.post('/auth/firebase-phone', { idToken, ...(name ? { name } : {}) }),
+  // Legacy OTP (fallback)
   sendOTP:      (phone: string)                        => api.post('/auth/send-otp', { phone }),
   verifyOTP:    (phone: string, otp: string, name?: string) =>
     api.post('/auth/verify-otp', { phone, otp, ...(name ? { name } : {}) }),
