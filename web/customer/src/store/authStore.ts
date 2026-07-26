@@ -6,10 +6,11 @@ import type { User } from '../types'
 interface AuthState {
   user: User | null
   isAuthenticated: boolean
-  login:        (email: string, password: string) => Promise<void>
-  loginWithOTP: (phone: string, otp: string, name?: string) => Promise<{ isNewUser: boolean }>
-  logout:       () => void
-  setUser:      (u: User) => void
+  login:             (email: string, password: string) => Promise<void>
+  loginWithOTP:      (phone: string, otp: string, name?: string) => Promise<{ isNewUser: boolean }>
+  loginWithEmailOTP: (email: string, otp: string) => Promise<void>
+  logout:            () => void
+  setUser:           (u: User) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -33,6 +34,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user, isAuthenticated: true })
     connectSocket(user.id)
     return { isNewUser: !!isNewUser }
+  },
+
+  loginWithEmailOTP: async (email, otp) => {
+    const res = await authApi.verifyEmailOTP(email, otp)
+    const { user, accessToken, refreshToken } = res.data.data
+    localStorage.setItem('cs_token', accessToken)
+    if (refreshToken) localStorage.setItem('cs_refresh', refreshToken)
+    set({ user, isAuthenticated: true })
+    connectSocket(user.id)
   },
 
   logout: () => {

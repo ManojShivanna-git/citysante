@@ -24,16 +24,19 @@ api.interceptors.response.use(
 
 export const authApi = {
   // Phone OTP (customers)
-  sendOTP:      (phone: string)                              => api.post('/auth/send-otp', { phone }),
-  verifyOTP:    (phone: string, otp: string, name?: string) => api.post('/auth/verify-otp', { phone, otp, ...(name ? { name } : {}) }),
-  resendOTP:    (phone: string)                              => api.post('/auth/resend-otp', { phone }),
+  sendOTP:        (phone: string)                              => api.post('/auth/send-otp', { phone }),
+  verifyOTP:      (phone: string, otp: string, name?: string) => api.post('/auth/verify-otp', { phone, otp, ...(name ? { name } : {}) }),
+  resendOTP:      (phone: string)                              => api.post('/auth/resend-otp', { phone }),
+  // Email OTP (all roles)
+  sendEmailOTP:   (email: string)                              => api.post('/auth/send-email-otp', { email }),
+  verifyEmailOTP: (email: string, otp: string)                 => api.post('/auth/verify-email-otp', { email, otp }),
   // Password (shop owners / riders)
-  register:     (data: object)                               => api.post('/auth/register', data),
-  login:        (email: string, password: string)            => api.post('/auth/login', { email, password }),
+  register:       (data: object)                               => api.post('/auth/register', data),
+  login:          (email: string, password: string)            => api.post('/auth/login', { email, password }),
   // Shared
-  me:           ()                                           => api.get('/auth/me'),
-  logout:       ()                                           => api.post('/auth/logout'),
-  updateProfile:(data: object)                               => api.put('/auth/profile', data),
+  me:             ()                                           => api.get('/auth/me'),
+  logout:         ()                                           => api.post('/auth/logout'),
+  updateProfile:  (data: object)                               => api.put('/auth/profile', data),
 }
 
 export const shopApi = {
