@@ -87,6 +87,9 @@ export const authApi = {
   verifyOTP:    (phone: string, otp: string, name?: string) =>
     api.post('/auth/verify-otp', { phone, otp, ...(name ? { name } : {}) }),
   resendOTP:    (phone: string)                        => api.post('/auth/resend-otp', { phone }),
+  // Email OTP (all roles)
+  sendEmailOTP:   (email: string)              => api.post('/auth/send-email-otp', { email }),
+  verifyEmailOTP: (email: string, otp: string) => api.post('/auth/verify-email-otp', { email, otp }),
   // Password (shop owners / riders / admin)
   login:        (email: string, password: string)      => api.post('/auth/login', { email, password }),
   register:     (name: string, email: string, phone: string, password: string) =>

@@ -22,7 +22,9 @@ api.interceptors.response.use(
 )
 
 export const authApi = {
-  login:    (email: string, password: string) => api.post('/auth/login', { email, password }),
+  login:          (email: string, password: string) => api.post('/auth/login', { email, password }),
+  sendEmailOTP:   (email: string)                   => api.post('/auth/send-email-otp', { email }),
+  verifyEmailOTP: (email: string, otp: string)      => api.post('/auth/verify-email-otp', { email, otp }),
   register: (data: { name: string; email: string; phone: string; password: string }) =>
     api.post('/auth/register', { ...data, role: 'shop_owner' }),
   me:     () => api.get('/auth/me'),

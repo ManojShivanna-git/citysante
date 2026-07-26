@@ -16,6 +16,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user, accessToken, refreshToken, isAuthenticated: true })
   },
 
+  loginWithTokens: (user, accessToken, refreshToken) => {
+    localStorage.setItem('accessToken', accessToken)
+    localStorage.setItem('refreshToken', refreshToken)
+    set({ user, accessToken, refreshToken, isAuthenticated: true })
+  },
+
   logout: () => {
     authApi.logout().catch(() => {})
     localStorage.removeItem('accessToken')

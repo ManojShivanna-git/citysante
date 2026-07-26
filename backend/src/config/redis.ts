@@ -23,6 +23,7 @@ redis.on('error',    (err) => console.error('❌ Redis error:', err.message))
 
 export const RedisKeys = {
   otp:           (phone: string)   => `otp:${phone}`,
+  emailOtp:      (email: string)   => `otp:email:${email}`,
   blacklistToken:(token: string)   => `blacklist:token:${token}`,
   riderLocation: (riderId: string) => `rider:location:${riderId}`,
   riderDuty:     (riderId: string) => `rider:duty:${riderId}`,

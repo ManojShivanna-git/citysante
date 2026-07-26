@@ -3,6 +3,7 @@ import {
   register, login, refreshToken, logout,
   getMe, updateProfile, changePassword,
   sendOTP, verifyOTP, resendOTP, saveFcmToken, firebasePhoneLogin,
+  sendEmailOTP, verifyEmailOTP,
 } from '../controllers/authController'
 import { authenticate } from '../middleware/auth'
 
@@ -15,6 +16,10 @@ router.post('/firebase-phone', firebasePhoneLogin)
 router.post('/send-otp',       sendOTP)
 router.post('/verify-otp',     verifyOTP)
 router.post('/resend-otp',     resendOTP)
+
+// ── Email OTP auth (all roles) ───────────────────────────────────────────
+router.post('/send-email-otp',   sendEmailOTP)
+router.post('/verify-email-otp', verifyEmailOTP)
 
 // ── Password auth (shop owners, riders, admin) ──────────────────────────
 router.post('/register',       register)

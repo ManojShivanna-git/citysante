@@ -8,6 +8,7 @@ interface AuthState {
   accessToken: string | null
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
+  loginWithTokens: (user: User, accessToken: string, refreshToken: string) => void
   logout: () => void
   setUser: (user: User) => void
 }
@@ -24,6 +25,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem('refreshToken', refreshToken)
     set({ user, accessToken, isAuthenticated: true })
     // Connect socket and join personal room so real-time events work
+    connectSocket(user.id)
+  },
+
+  loginWithTokens: (user, accessToken, refreshToken) => {
+    localStorage.setItem('accessToken', accessToken)
+    localStorage.setItem('refreshToken', refreshToken)
+    set({ user, accessToken, isAuthenticated: true })
     connectSocket(user.id)
   },
 

@@ -6,6 +6,7 @@ import redis, { RedisKeys, TTL } from '../config/redis'
 import { AuthRequest, AuthPayload, UserRole } from '../types'
 import { createError } from '../middleware/errorHandler'
 import { sendOTPSms } from '../services/smsService'
+import { sendOTPEmail } from '../services/emailService'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -386,6 +387,74 @@ export const changePassword = async (req: AuthRequest, res: Response, next: Next
     await query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, req.user?.userId])
 
     res.json({ success: true, message: 'Password changed successfully' })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ─── Send Email OTP ───────────────────────────────────────────────────────
+
+export const sendEmailOTP = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email } = req.body
+    if (!email) throw createError('Email is required', 400)
+
+    const existing = await query(
+      'SELECT id, is_active FROM users WHERE email = $1',
+      [email]
+    )
+    if (existing.rows.length === 0) throw createError('No account found with this email', 404)
+    if (!existing.rows[0].is_active) throw createError('Account is suspended. Please contact support.', 403)
+
+    const otp = generateOTP()
+    await redis.setex(RedisKeys.emailOtp(email), TTL.OTP, otp)
+    await sendOTPEmail(email, otp)
+
+    res.json({ success: true, message: 'OTP sent to your email' })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ─── Verify Email OTP ─────────────────────────────────────────────────────
+
+export const verifyEmailOTP = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, otp } = req.body
+    if (!email || !otp) throw createError('Email and OTP are required', 400)
+
+    const storedOTP = await redis.get(RedisKeys.emailOtp(email))
+    console.log(`🔍 verify-email-otp | email="${email}" submitted="${otp}" stored="${storedOTP}"`)
+    if (!storedOTP) throw createError('OTP expired — please request a new one', 400)
+    if (storedOTP !== otp) throw createError('Invalid OTP', 400)
+
+    await redis.del(RedisKeys.emailOtp(email))
+
+    const result = await query(
+      `SELECT id, name, email, phone, role, is_active, is_verified, profile_photo_url
+       FROM users WHERE email = $1`,
+      [email]
+    )
+    if (result.rows.length === 0) throw createError('User not found', 404)
+
+    const user = result.rows[0]
+    if (!user.is_active) throw createError('Account is suspended. Please contact support.', 403)
+
+    await query('UPDATE users SET is_verified = TRUE, last_login_at = NOW() WHERE id = $1', [user.id])
+
+    let shopId: string | undefined
+    if (user.role === 'shop_owner') {
+      const shopResult = await query('SELECT id FROM shops WHERE owner_id = $1 LIMIT 1', [user.id])
+      if (shopResult.rows.length > 0) shopId = shopResult.rows[0].id
+    }
+
+    const tokens = generateTokens({ userId: user.id, role: user.role, shopId })
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: { user, ...tokens },
+    })
   } catch (err) {
     next(err)
   }
