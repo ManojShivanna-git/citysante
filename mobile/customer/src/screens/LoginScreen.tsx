@@ -3,7 +3,6 @@ import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert,
   KeyboardAvoidingView, Platform, ScrollView,
-  TextInput as RNTextInput,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import * as SecureStore from 'expo-secure-store'
@@ -11,33 +10,21 @@ import { authApi } from '../api/api'
 import { useAuthStore } from '../store/authStore'
 import { RED } from '../theme'
 
-type LoginMode = 'phone' | 'email'
-type PhoneStep = 'phone' | 'otp'
-type EmailStep = 'email' | 'otp'
+// Phone OTP login is hidden until DLT registration is complete.
+// Switch back to phone by restoring the previous LoginScreen version.
+
+type Step = 'email' | 'otp'
 
 export default function LoginScreen() {
   const { setAuth } = useAuthStore()
 
-  // ── Shared ─────────────────────────────────────────────────────────────
-  const [mode, setMode]     = useState<LoginMode>('phone')
+  const [step, setStep]       = useState<Step>('email')
+  const [email, setEmail]     = useState('')
+  const [otp, setOtp]         = useState('')
   const [loading, setLoading] = useState(false)
-  const [timer, setTimer]   = useState(0)
+  const [timer, setTimer]     = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // ── Phone OTP state ────────────────────────────────────────────────────
-  const [phoneStep, setPhoneStep]   = useState<PhoneStep>('phone')
-  const [phone, setPhone]           = useState('')
-  const [phoneOtp, setPhoneOtp]     = useState(['', '', '', '', '', ''])
-  const [name, setName]             = useState('')
-  const [isNewUser, setIsNewUser]   = useState(false)
-  const otpRefs = useRef<(RNTextInput | null)[]>([])
-
-  // ── Email OTP state ────────────────────────────────────────────────────
-  const [emailStep, setEmailStep]   = useState<EmailStep>('email')
-  const [emailAddr, setEmailAddr]   = useState('')
-  const [emailOtpStr, setEmailOtpStr] = useState('')
-
-  // ── Helpers ────────────────────────────────────────────────────────────
   const startTimer = () => {
     setTimer(30)
     if (timerRef.current) clearInterval(timerRef.current)
@@ -46,84 +33,15 @@ export default function LoginScreen() {
     }, 1000)
   }
 
-  const switchMode = (m: LoginMode) => {
-    setMode(m)
-    setPhoneStep('phone'); setPhoneOtp(['', '', '', '', '', ''])
-    setEmailStep('email'); setEmailOtpStr('')
-  }
-
-  // ── Phone OTP handlers ─────────────────────────────────────────────────
-  const handleSendPhoneOTP = async () => {
-    const cleaned = phone.replace(/\D/g, '')
-    if (!/^[6-9]\d{9}$/.test(cleaned)) {
-      Alert.alert('Invalid number', 'Enter a valid 10-digit Indian mobile number')
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await authApi.sendOTP(cleaned)
-      setIsNewUser(res.data.data.isNewUser)
-      setPhoneStep('otp')
-      startTimer()
-      setTimeout(() => otpRefs.current[0]?.focus(), 100)
-    } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.message || 'Failed to send OTP. Try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleVerifyPhoneOTP = async () => {
-    const otpStr = phoneOtp.join('')
-    if (otpStr.length !== 6) { Alert.alert('Invalid OTP', 'Enter the 6-digit OTP'); return }
-    if (isNewUser && !name.trim()) { Alert.alert('Name required', 'Please enter your name'); return }
-    setLoading(true)
-    try {
-      const res = await authApi.verifyOTP(phone.replace(/\D/g, ''), otpStr, isNewUser ? name.trim() : undefined)
-      const { user, accessToken, refreshToken } = res.data.data
-      if (refreshToken) await SecureStore.setItemAsync('customer_refresh_token', refreshToken)
-      await setAuth(user, accessToken)
-    } catch (err: any) {
-      Alert.alert('Invalid OTP', err?.response?.data?.message || 'OTP is incorrect or expired')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleResendPhoneOTP = async () => {
-    if (timer > 0) return
-    setLoading(true)
-    try {
-      await authApi.resendOTP(phone.replace(/\D/g, ''))
-      setPhoneOtp(['', '', '', '', '', ''])
-      otpRefs.current[0]?.focus()
-      startTimer()
-    } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.message || 'Failed to resend OTP')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleOtpChange = (val: string, idx: number) => {
-    const digit = val.replace(/\D/g, '').slice(-1)
-    const next = [...phoneOtp]
-    next[idx] = digit
-    setPhoneOtp(next)
-    if (digit && idx < 5) otpRefs.current[idx + 1]?.focus()
-    if (!val && idx > 0) otpRefs.current[idx - 1]?.focus()
-  }
-
-  // ── Email OTP handlers ─────────────────────────────────────────────────
-  const handleSendEmailOTP = async () => {
-    if (!emailAddr.trim() || !emailAddr.includes('@')) {
+  const handleSendOTP = async () => {
+    if (!email.trim() || !email.includes('@')) {
       Alert.alert('Invalid email', 'Enter a valid email address')
       return
     }
     setLoading(true)
     try {
-      await authApi.sendEmailOTP(emailAddr.trim())
-      setEmailStep('otp')
+      await authApi.sendEmailOTP(email.trim())
+      setStep('otp')
       startTimer()
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.message || 'No account found with this email')
@@ -132,11 +50,11 @@ export default function LoginScreen() {
     }
   }
 
-  const handleVerifyEmailOTP = async () => {
-    if (emailOtpStr.length !== 6) { Alert.alert('Invalid OTP', 'Enter the 6-digit OTP'); return }
+  const handleVerifyOTP = async () => {
+    if (otp.length !== 6) { Alert.alert('Invalid OTP', 'Enter the 6-digit OTP'); return }
     setLoading(true)
     try {
-      const res = await authApi.verifyEmailOTP(emailAddr.trim(), emailOtpStr)
+      const res = await authApi.verifyEmailOTP(email.trim(), otp)
       const { user, accessToken, refreshToken } = res.data.data
       if (user.role !== 'customer') {
         Alert.alert('Wrong app', 'Please use the correct app for your role')
@@ -151,12 +69,12 @@ export default function LoginScreen() {
     }
   }
 
-  const handleResendEmailOTP = async () => {
+  const handleResend = async () => {
     if (timer > 0) return
     setLoading(true)
     try {
-      await authApi.sendEmailOTP(emailAddr.trim())
-      setEmailOtpStr('')
+      await authApi.sendEmailOTP(email.trim())
+      setOtp('')
       startTimer()
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.message || 'Failed to resend OTP')
@@ -169,7 +87,6 @@ export default function LoginScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoBox}>
             <Text style={{ fontSize: 26 }}>🛒</Text>
@@ -180,101 +97,18 @@ export default function LoginScreen() {
 
         <View style={styles.card}>
 
-          {/* ── Mode tab switcher ──────────────────────────────────────── */}
-          <View style={styles.tabs}>
-            {(['phone', 'email'] as LoginMode[]).map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.tab, mode === m && styles.tabActive]}
-                onPress={() => switchMode(m)}
-              >
-                <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
-                  {m === 'phone' ? '📱 Mobile' : '📧 Email'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* ── Phone OTP: step 1 — enter number ──────────────────────── */}
-          {mode === 'phone' && phoneStep === 'phone' && (
+          {/* ── Step 1: Enter email ── */}
+          {step === 'email' && (
             <>
-              <Text style={styles.title}>Enter your mobile number</Text>
-              <Text style={styles.subtitle}>We'll send you a verification code</Text>
-              <View style={styles.phoneRow}>
-                <View style={styles.countryCode}>
-                  <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
-                </View>
+              <Text style={styles.title}>Sign in to Isanthe</Text>
+              <Text style={styles.subtitle}>We'll send a 6-digit code to your email</Text>
+
+              <View style={styles.inputRow}>
+                <Ionicons name="mail-outline" size={18} color="#9ca3af" style={styles.inputIcon} />
                 <TextInput
-                  style={styles.phoneInput}
-                  value={phone}
-                  onChangeText={(v) => setPhone(v.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="10-digit mobile number"
-                  placeholderTextColor="#9ca3af"
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  autoFocus
-                />
-              </View>
-              <TouchableOpacity style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
-                onPress={handleSendPhoneOTP} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Send OTP</Text>}
-              </TouchableOpacity>
-            </>
-          )}
-
-          {/* ── Phone OTP: step 2 — enter code ────────────────────────── */}
-          {mode === 'phone' && phoneStep === 'otp' && (
-            <>
-              <TouchableOpacity onPress={() => setPhoneStep('phone')} style={styles.backBtn}>
-                <Ionicons name="arrow-back" size={20} color={RED} />
-                <Text style={styles.changeNum}>Change number</Text>
-              </TouchableOpacity>
-              <Text style={styles.title}>{isNewUser ? 'Verify & create account' : 'Enter OTP'}</Text>
-              <Text style={styles.subtitle}>Sent to +91 {phone}</Text>
-              <View style={styles.otpRow}>
-                {phoneOtp.map((digit, i) => (
-                  <TextInput key={i} ref={(r) => { otpRefs.current[i] = r }}
-                    style={[styles.otpBox, digit ? styles.otpBoxFilled : undefined]}
-                    value={digit} onChangeText={(v) => handleOtpChange(v, i)}
-                    keyboardType="number-pad" maxLength={1} selectTextOnFocus />
-                ))}
-              </View>
-              {isNewUser && (
-                <View style={styles.nameSection}>
-                  <Text style={styles.nameLabel}>Your name <Text style={{ color: RED }}>*</Text></Text>
-                  <View style={styles.nameInputRow}>
-                    <Ionicons name="person-outline" size={16} color="#9ca3af" style={styles.nameIcon} />
-                    <TextInput style={styles.nameInput} value={name} onChangeText={setName}
-                      placeholder="e.g. Ravi Kumar" placeholderTextColor="#9ca3af" autoCapitalize="words" />
-                  </View>
-                  <Text style={styles.newUserHint}>You're creating a new account</Text>
-                </View>
-              )}
-              <TouchableOpacity style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
-                onPress={handleVerifyPhoneOTP} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> :
-                  <Text style={styles.primaryBtnText}>{isNewUser ? 'Create Account' : 'Verify & Login'}</Text>}
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.resendBtn, (timer > 0 || loading) && { opacity: 0.4 }]}
-                onPress={handleResendPhoneOTP} disabled={timer > 0 || loading}>
-                <Text style={styles.resendText}>
-                  {timer > 0 ? `Resend OTP in ${timer}s` : 'Resend OTP'}
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {/* ── Email OTP: step 1 — enter email ───────────────────────── */}
-          {mode === 'email' && emailStep === 'email' && (
-            <>
-              <Text style={styles.title}>Enter your email</Text>
-              <Text style={styles.subtitle}>We'll send a 6-digit code to your inbox</Text>
-              <View style={styles.emailRow}>
-                <Ionicons name="mail-outline" size={18} color="#9ca3af" style={styles.emailIcon} />
-                <TextInput
-                  style={styles.emailInput}
-                  value={emailAddr}
-                  onChangeText={setEmailAddr}
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
                   placeholder="you@example.com"
                   placeholderTextColor="#9ca3af"
                   keyboardType="email-address"
@@ -283,38 +117,61 @@ export default function LoginScreen() {
                   autoFocus
                 />
               </View>
-              <TouchableOpacity style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
-                onPress={handleSendEmailOTP} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Send OTP</Text>}
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
+                onPress={handleSendOTP}
+                disabled={loading}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.primaryBtnText}>Send OTP</Text>
+                }
               </TouchableOpacity>
             </>
           )}
 
-          {/* ── Email OTP: step 2 — enter code ────────────────────────── */}
-          {mode === 'email' && emailStep === 'otp' && (
+          {/* ── Step 2: Enter OTP ── */}
+          {step === 'otp' && (
             <>
-              <TouchableOpacity onPress={() => setEmailStep('email')} style={styles.backBtn}>
+              <TouchableOpacity onPress={() => { setStep('email'); setOtp('') }} style={styles.backBtn}>
                 <Ionicons name="arrow-back" size={20} color={RED} />
-                <Text style={styles.changeNum}>Change email</Text>
+                <Text style={styles.backText}>Change email</Text>
               </TouchableOpacity>
+
+              <View style={styles.otpHeader}>
+                <Text style={{ fontSize: 32 }}>📧</Text>
+              </View>
               <Text style={styles.title}>Enter OTP</Text>
-              <Text style={styles.subtitle}>Sent to {emailAddr}</Text>
+              <Text style={styles.subtitle}>Sent to {email}</Text>
+
               <TextInput
-                style={styles.emailOtpInput}
-                value={emailOtpStr}
-                onChangeText={(v) => setEmailOtpStr(v.replace(/\D/g, '').slice(0, 6))}
+                style={styles.otpInput}
+                value={otp}
+                onChangeText={(v) => setOtp(v.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
                 placeholderTextColor="#9ca3af"
                 keyboardType="number-pad"
                 maxLength={6}
                 autoFocus
               />
-              <TouchableOpacity style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
-                onPress={handleVerifyEmailOTP} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Verify & Login</Text>}
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, (loading || otp.length !== 6) && { opacity: 0.7 }]}
+                onPress={handleVerifyOTP}
+                disabled={loading || otp.length !== 6}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.primaryBtnText}>Verify & Login</Text>
+                }
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.resendBtn, (timer > 0 || loading) && { opacity: 0.4 }]}
-                onPress={handleResendEmailOTP} disabled={timer > 0 || loading}>
+
+              <TouchableOpacity
+                style={[styles.resendBtn, (timer > 0 || loading) && { opacity: 0.4 }]}
+                onPress={handleResend}
+                disabled={timer > 0 || loading}
+              >
                 <Text style={styles.resendText}>
                   {timer > 0 ? `Resend OTP in ${timer}s` : 'Resend OTP'}
                 </Text>
@@ -337,7 +194,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:      { flexGrow: 1, backgroundColor: '#f9fafb' },
+  container:   { flexGrow: 1, backgroundColor: '#f9fafb' },
   header: {
     backgroundColor: RED, paddingTop: 72, paddingBottom: 48, alignItems: 'center',
   },
@@ -347,24 +204,31 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center', justifyContent: 'center', marginBottom: 14,
   },
-  appName:    { fontSize: 30, fontWeight: '800', color: '#fff', marginBottom: 4 },
-  tagline:    { fontSize: 14, color: 'rgba(255,255,255,0.75)' },
+  appName:     { fontSize: 30, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  tagline:     { fontSize: 14, color: 'rgba(255,255,255,0.75)' },
   card: {
     backgroundColor: '#fff', margin: 16, borderRadius: 20, padding: 24,
     shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 }, elevation: 4, marginTop: -28,
   },
-  // ── Tabs ──────────────────────────────────────────────────────────────
-  tabs:        { flexDirection: 'row', backgroundColor: '#f3f4f6', borderRadius: 12, padding: 4, marginBottom: 20, gap: 4 },
-  tab:         { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
-  tabActive:   { backgroundColor: RED },
-  tabText:     { fontSize: 13, fontWeight: '600', color: '#6b7280' },
-  tabTextActive: { color: '#fff' },
-  // ── Shared inputs ─────────────────────────────────────────────────────
-  backBtn:     { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 4 },
-  changeNum:   { fontSize: 14, color: RED, fontWeight: '600' },
   title:       { fontSize: 20, fontWeight: '800', color: '#111', marginBottom: 4 },
   subtitle:    { fontSize: 14, color: '#6b7280', marginBottom: 20 },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
+    backgroundColor: '#fafafa', paddingHorizontal: 14, marginBottom: 20,
+  },
+  inputIcon:   { marginRight: 8 },
+  input:       { flex: 1, fontSize: 15, color: '#111', paddingVertical: 14 },
+  otpHeader:   { alignItems: 'center', marginBottom: 12 },
+  backBtn:     { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 4 },
+  backText:    { fontSize: 14, color: RED, fontWeight: '600' },
+  otpInput: {
+    borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
+    backgroundColor: '#f9fafb', textAlign: 'center',
+    fontSize: 32, fontWeight: '800', color: '#111',
+    letterSpacing: 12, paddingVertical: 14, marginBottom: 20,
+  },
   primaryBtn: {
     backgroundColor: RED, borderRadius: 14, paddingVertical: 15, alignItems: 'center',
     shadowColor: RED, shadowOffset: { width: 0, height: 4 },
@@ -373,49 +237,5 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   resendBtn:   { marginTop: 16, alignItems: 'center' },
   resendText:  { fontSize: 14, color: RED, fontWeight: '600' },
-  // ── Phone OTP ─────────────────────────────────────────────────────────
-  phoneRow:    { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  countryCode: {
-    paddingHorizontal: 14, paddingVertical: 14,
-    borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
-    backgroundColor: '#f9fafb', justifyContent: 'center',
-  },
-  countryCodeText: { fontSize: 15, fontWeight: '600', color: '#374151' },
-  phoneInput: {
-    flex: 1, borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
-    paddingHorizontal: 14, fontSize: 16, color: '#111', backgroundColor: '#fafafa',
-  },
-  otpRow:      { flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 20 },
-  otpBox: {
-    width: 46, height: 54, borderRadius: 12,
-    borderWidth: 1.5, borderColor: '#e5e7eb', backgroundColor: '#f9fafb',
-    textAlign: 'center', fontSize: 22, fontWeight: '700', color: '#111',
-  },
-  otpBoxFilled: { borderColor: RED, backgroundColor: '#fff1f2' },
-  nameSection:  { marginBottom: 20 },
-  nameLabel:    { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
-  nameInputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
-    backgroundColor: '#fafafa', paddingHorizontal: 12,
-  },
-  nameIcon:     { marginRight: 8 },
-  nameInput:    { flex: 1, fontSize: 15, color: '#111', paddingVertical: 12 },
-  newUserHint:  { fontSize: 11, color: '#9ca3af', marginTop: 5 },
-  // ── Email OTP ─────────────────────────────────────────────────────────
-  emailRow: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
-    backgroundColor: '#fafafa', paddingHorizontal: 14, marginBottom: 20,
-  },
-  emailIcon:    { marginRight: 8 },
-  emailInput:   { flex: 1, fontSize: 15, color: '#111', paddingVertical: 14 },
-  emailOtpInput: {
-    borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
-    backgroundColor: '#f9fafb', textAlign: 'center',
-    fontSize: 32, fontWeight: '800', color: '#111',
-    letterSpacing: 12, paddingVertical: 14, marginBottom: 20,
-  },
-  // ── Footer ────────────────────────────────────────────────────────────
   terms: { textAlign: 'center', fontSize: 12, color: '#9ca3af', margin: 20, lineHeight: 18 },
 })
