@@ -105,7 +105,7 @@ CREATE TABLE users (
   name              VARCHAR(100) NOT NULL,
   email             VARCHAR(150) UNIQUE,
   phone             VARCHAR(15) UNIQUE NOT NULL,
-  password_hash     TEXT NOT NULL,
+  password_hash     TEXT,
   profile_photo_url TEXT,
   is_active         BOOLEAN DEFAULT TRUE,
   is_verified       BOOLEAN DEFAULT FALSE,  -- phone OTP verified

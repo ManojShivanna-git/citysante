@@ -147,6 +147,7 @@ async function applySchemaPatches() {
   try {
     await pool.query(`ALTER TABLE shops ADD COLUMN IF NOT EXISTS payment_due_at TIMESTAMPTZ`)
     await pool.query(`ALTER TABLE product_requests ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES categories(id)`)
+    await pool.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`)
 
     // Fix: coverage view must count pending shops too, not just active ones.
     // DROP first because CREATE OR REPLACE cannot rename columns.
