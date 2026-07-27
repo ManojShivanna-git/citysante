@@ -133,7 +133,7 @@ export default function LoginPage() {
               <div className="text-center">
                 <p className="text-gray-300 text-sm">OTP sent to</p>
                 <p className="text-white font-medium text-sm mt-0.5">+91 {phone}</p>
-                <button type="button" onClick={() => { setStep('phone'); setOtp('') }}
+                <button type="button" onClick={() => { setStep('phone'); setOtp(''); resetRecaptcha() }}
                   className="text-brand-400 text-xs mt-1 hover:underline">Change number</button>
               </div>
               <div>

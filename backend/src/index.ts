@@ -67,6 +67,9 @@ io.on('connection', (socket) => {
 
 // ─── Middleware ───────────────────────────────────────────────────────────
 
+// Trust Nginx reverse proxy (needed for rate limiting + real IP detection)
+app.set('trust proxy', 1)
+
 // crossOriginResourcePolicy disabled so product/category images under /uploads
 // can be embedded by the web apps (different dev-server origins) and loaded
 // directly by the mobile apps.
