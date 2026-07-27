@@ -1,6 +1,8 @@
 import { io, Socket } from 'socket.io-client'
 
-export const SOCKET_URL = (import.meta as any).env?.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'
+// Remove trailing /api from the API URL to get the socket base URL.
+// Use regex with $ anchor so it only strips the suffix, not the api subdomain.
+export const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '')
 
 let socket: Socket | null = null
 
