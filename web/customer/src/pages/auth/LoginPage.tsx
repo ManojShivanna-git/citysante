@@ -1,24 +1,32 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
-import { authApi } from '../../services/api'
-import { ArrowLeft, ArrowRight, Mail } from 'lucide-react'
+import { auth } from '../../services/firebase'
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth'
+import { ArrowLeft, ArrowRight, Phone, User } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-type Step = 'email' | 'otp'
+type Step = 'phone' | 'otp'
 
 export default function LoginPage() {
-  const { loginWithEmailOTP } = useAuthStore()
+  const { loginWithPhone } = useAuthStore()
   const navigate = useNavigate()
 
-  const [step, setStep]       = useState<Step>('email')
-  const [email, setEmail]     = useState('')
+  const [step, setStep]       = useState<Step>('phone')
+  const [phone, setPhone]     = useState('')
   const [otp, setOtp]         = useState('')
+  const [name, setName]       = useState('')
+  const [isNewUser, setIsNewUser] = useState(false)
   const [loading, setLoading] = useState(false)
   const [timer, setTimer]     = useState(0)
   const timerRef              = useRef<ReturnType<typeof setInterval> | null>(null)
+  const confirmRef            = useRef<ConfirmationResult | null>(null)
+  const recaptchaRef          = useRef<RecaptchaVerifier | null>(null)
 
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
+  useEffect(() => () => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    recaptchaRef.current?.clear()
+  }, [])
 
   const startTimer = () => {
     setTimer(30)
@@ -28,16 +36,40 @@ export default function LoginPage() {
     }, 1000)
   }
 
+  const getRecaptcha = () => {
+    if (!recaptchaRef.current) {
+      recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+      })
+    }
+    return recaptchaRef.current
+  }
+
+  const resetRecaptcha = () => {
+    recaptchaRef.current?.clear()
+    recaptchaRef.current = null
+  }
+
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email.includes('@')) { toast.error('Enter a valid email address'); return }
+    const cleaned = phone.replace(/\D/g, '')
+    if (!/^[6-9]\d{9}$/.test(cleaned)) {
+      toast.error('Enter a valid 10-digit Indian mobile number')
+      return
+    }
     setLoading(true)
     try {
-      await authApi.sendEmailOTP(email.trim())
-      toast.success('OTP sent to your email')
+      const verifier = getRecaptcha()
+      const result = await signInWithPhoneNumber(auth, '+91' + cleaned, verifier)
+      confirmRef.current = result
       setStep('otp')
       startTimer()
-    } catch {
+      toast.success('OTP sent!')
+    } catch (err: any) {
+      resetRecaptcha()
+      toast.error(err?.message?.includes('too-many-requests')
+        ? 'Too many attempts. Try again later.'
+        : 'Failed to send OTP. Check the number and try again.')
     } finally {
       setLoading(false)
     }
@@ -46,12 +78,28 @@ export default function LoginPage() {
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     if (otp.length !== 6) { toast.error('Enter the 6-digit OTP'); return }
+    if (!confirmRef.current) { toast.error('Session expired. Resend OTP.'); return }
     setLoading(true)
     try {
-      await loginWithEmailOTP(email.trim(), otp)
-      toast.success('Welcome back! 👋')
+      const credential = await confirmRef.current.confirm(otp)
+      const idToken = await credential.user.getIdToken()
+      const { isNewUser: newUser } = await loginWithPhone(
+        idToken,
+        isNewUser && name.trim() ? name.trim() : undefined
+      )
+      setIsNewUser(newUser)
+      if (newUser && !name.trim()) {
+        // Need name — stay on OTP step and show name field
+        setIsNewUser(true)
+        toast('Almost there! Enter your name to finish.')
+        setLoading(false)
+        return
+      }
+      toast.success(newUser ? 'Welcome to Isanthe! 🎉' : 'Welcome back! 👋')
       navigate('/')
-    } catch {
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Invalid OTP'
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -60,12 +108,18 @@ export default function LoginPage() {
   const handleResend = async () => {
     if (timer > 0) return
     setLoading(true)
+    resetRecaptcha()
     try {
-      await authApi.sendEmailOTP(email.trim())
+      const cleaned = phone.replace(/\D/g, '')
+      const verifier = getRecaptcha()
+      const result = await signInWithPhoneNumber(auth, '+91' + cleaned, verifier)
+      confirmRef.current = result
       setOtp('')
       startTimer()
       toast.success('OTP resent!')
     } catch {
+      resetRecaptcha()
+      toast.error('Failed to resend OTP')
     } finally {
       setLoading(false)
     }
@@ -73,12 +127,13 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
+      {/* reCAPTCHA container — invisible but required */}
+      <div id="recaptcha-container" />
 
       {/* ── Left panel ── */}
       <div className="hidden lg:flex flex-col flex-1 bg-gradient-to-br from-red-600 via-red-500 to-yellow-400 text-white p-12 relative overflow-hidden">
         <div className="absolute -top-16 -left-16 w-64 h-64 bg-white/10 rounded-full" />
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
-        <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2" />
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-16">
             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">🛒</div>
@@ -92,7 +147,7 @@ export default function LoginPage() {
             {[
               { icon: '⚡', title: 'Lightning fast',  sub: '10–30 min delivery' },
               { icon: '💰', title: 'Best prices',     sub: 'Direct from local shops' },
-              { icon: '📧', title: 'No password',     sub: 'Just your email' },
+              { icon: '📱', title: 'No password',     sub: 'Just your phone number' },
             ].map(({ icon, title, sub }) => (
               <div key={title} className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center text-xl shrink-0">{icon}</div>
@@ -108,8 +163,6 @@ export default function LoginPage() {
 
       {/* ── Right panel ── */}
       <div className="flex-1 lg:max-w-md flex flex-col items-center justify-center p-8 bg-[#fafaf9]">
-
-        {/* Mobile logo */}
         <div className="flex items-center gap-3 mb-10 lg:hidden">
           <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-yellow-400 rounded-xl flex items-center justify-center text-xl shadow-md shadow-red-200">🛒</div>
           <span className="font-extrabold text-2xl">Isanthe</span>
@@ -117,31 +170,31 @@ export default function LoginPage() {
 
         <div className="w-full max-w-sm">
 
-          {/* ── Step 1: Enter email ── */}
-          {step === 'email' && (
+          {/* ── Step 1: Phone number ── */}
+          {step === 'phone' && (
             <>
-              <h1 className="text-2xl font-extrabold text-gray-900">Sign in to Isanthe</h1>
-              <p className="text-gray-500 text-sm mt-1 mb-8">We'll send a 6-digit code to your email</p>
+              <h1 className="text-2xl font-extrabold text-gray-900">Enter your mobile number</h1>
+              <p className="text-gray-500 text-sm mt-1 mb-8">We'll send you a verification code</p>
 
               <form onSubmit={handleSendOTP} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email address</label>
-                  <div className="relative">
-                    <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="email"
-                      className="input pl-10 w-full"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoFocus
-                      required
-                    />
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mobile number</label>
+                  <div className="flex gap-2">
+                    <div className="flex items-center gap-1.5 px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm font-semibold text-gray-600 shrink-0">
+                      🇮🇳 +91
+                    </div>
+                    <div className="relative flex-1">
+                      <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input type="tel" className="input pl-10 w-full" placeholder="10-digit number"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        autoFocus required />
+                    </div>
                   </div>
                 </div>
                 <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-base">
                   {loading
-                    ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending OTP…</span>
+                    ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending…</span>
                     : <span className="flex items-center justify-center gap-2">Send OTP <ArrowRight size={16} /></span>
                   }
                 </button>
@@ -149,29 +202,32 @@ export default function LoginPage() {
 
               <p className="text-center text-xs text-gray-400 mt-6 leading-relaxed">
                 By continuing, you agree to our Terms of Service and Privacy Policy.
+                <br />New users are automatically registered.
               </p>
             </>
           )}
 
-          {/* ── Step 2: Enter OTP ── */}
+          {/* ── Step 2: OTP ── */}
           {step === 'otp' && (
             <>
-              <button onClick={() => { setStep('email'); setOtp('') }}
+              <button onClick={() => { setStep('phone'); setOtp(''); setIsNewUser(false) }}
                 className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-8 transition-colors">
-                <ArrowLeft size={16} /> Change email
+                <ArrowLeft size={16} /> Change number
               </button>
 
               <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-red-100">📧</div>
-                <h1 className="text-2xl font-extrabold text-gray-900">Enter OTP</h1>
+                <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-red-100">📱</div>
+                <h1 className="text-2xl font-extrabold text-gray-900">
+                  {isNewUser ? 'Verify & create account' : 'Enter OTP'}
+                </h1>
                 <p className="text-gray-500 text-sm mt-2">
-                  Sent to <span className="font-semibold text-gray-700">{email}</span>
+                  Sent to <span className="font-semibold text-gray-700">+91 {phone}</span>
                 </p>
               </div>
 
               <form onSubmit={handleVerifyOTP} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">6-digit code</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">Enter OTP</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -184,10 +240,24 @@ export default function LoginPage() {
                   />
                 </div>
 
+                {isNewUser && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Your name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input type="text" className="input pl-10 w-full" placeholder="e.g. Ravi Kumar"
+                        value={name} onChange={(e) => setName(e.target.value)} required />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">You're creating a new account</p>
+                  </div>
+                )}
+
                 <button type="submit" disabled={loading || otp.length !== 6} className="btn-primary w-full py-3 text-base">
                   {loading
-                    ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Verifying…</span>
-                    : <span className="flex items-center justify-center gap-2">Verify & Login <ArrowRight size={16} /></span>
+                    ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />{isNewUser ? 'Creating account…' : 'Verifying…'}</span>
+                    : <span className="flex items-center justify-center gap-2">{isNewUser ? 'Create Account' : 'Verify & Login'} <ArrowRight size={16} /></span>
                   }
                 </button>
               </form>

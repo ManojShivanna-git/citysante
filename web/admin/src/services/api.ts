@@ -33,6 +33,7 @@ export const authApi = {
   login:          (email: string, password: string) => api.post('/auth/login', { email, password }),
   sendEmailOTP:   (email: string)                   => api.post('/auth/send-email-otp', { email }),
   verifyEmailOTP: (email: string, otp: string)      => api.post('/auth/verify-email-otp', { email, otp }),
+  firebasePhone:  (idToken: string)                 => api.post('/auth/firebase-phone', { idToken, expectedRole: 'any' }),
   me:     () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),
 }

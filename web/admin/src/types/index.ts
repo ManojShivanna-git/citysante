@@ -21,6 +21,7 @@ export interface AuthState {
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
   loginWithTokens: (user: User, accessToken: string, refreshToken: string) => void
+  loginWithPhone: (idToken: string) => Promise<void>
   logout: () => void
 }
 

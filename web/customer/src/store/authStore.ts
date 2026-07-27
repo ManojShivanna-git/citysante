@@ -9,6 +9,7 @@ interface AuthState {
   login:             (email: string, password: string) => Promise<void>
   loginWithOTP:      (phone: string, otp: string, name?: string) => Promise<{ isNewUser: boolean }>
   loginWithEmailOTP: (email: string, otp: string) => Promise<void>
+  loginWithPhone:    (idToken: string, name?: string) => Promise<{ isNewUser: boolean }>
   logout:            () => void
   setUser:           (u: User) => void
 }
@@ -28,6 +29,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   loginWithOTP: async (phone, otp, name) => {
     const res = await authApi.verifyOTP(phone, otp, name)
+    const { user, accessToken, refreshToken, isNewUser } = res.data.data
+    localStorage.setItem('cs_token', accessToken)
+    if (refreshToken) localStorage.setItem('cs_refresh', refreshToken)
+    set({ user, isAuthenticated: true })
+    connectSocket(user.id)
+    return { isNewUser: !!isNewUser }
+  },
+
+  loginWithPhone: async (idToken, name) => {
+    const res = await authApi.firebasePhone(idToken, name)
     const { user, accessToken, refreshToken, isNewUser } = res.data.data
     localStorage.setItem('cs_token', accessToken)
     if (refreshToken) localStorage.setItem('cs_refresh', refreshToken)

@@ -112,19 +112,16 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
 
 export const firebasePhoneLogin = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { idToken, name } = req.body
+    const { idToken, name, expectedRole = 'customer' } = req.body
     if (!idToken) throw createError('Firebase ID token is required', 400)
 
-    // Verify token with Firebase Admin
     const admin = (await import('../config/firebase')).default
     const decoded = await admin.auth().verifyIdToken(idToken)
-    const firebasePhone = decoded.phone_number   // e.g. "+919876543210"
+    const firebasePhone = decoded.phone_number
     if (!firebasePhone) throw createError('Phone number not found in Firebase token', 400)
 
-    // Strip +91 country code → 10-digit local number stored in DB
     const phone = firebasePhone.replace(/^\+91/, '')
 
-    // Find or create customer
     let userResult = await query(
       `SELECT id, name, email, phone, role, is_active, is_verified, profile_photo_url
        FROM users WHERE phone = $1`,
@@ -132,7 +129,13 @@ export const firebasePhoneLogin = async (req: Request, res: Response, next: Next
     )
 
     let isNewUser = false
+
     if (userResult.rows.length === 0) {
+      if (expectedRole !== 'customer') {
+        // Shop owners and riders must have accounts created by admin
+        throw createError('No account found with this number. Contact your admin.', 404)
+      }
+      // Auto-create customer account
       isNewUser = true
       const newUser = await query(
         `INSERT INTO users (name, phone, role, is_verified, is_active)
@@ -147,9 +150,19 @@ export const firebasePhoneLogin = async (req: Request, res: Response, next: Next
 
     const user = userResult.rows[0]
     if (!user.is_active) throw createError('Account suspended. Contact support.', 403)
-    if (user.role !== 'customer') throw createError('Please use the correct app for your role', 403)
 
-    const tokens = generateTokens({ userId: user.id, role: user.role })
+    // Role check — allow any role for 'any', otherwise enforce
+    if (expectedRole !== 'any' && user.role !== expectedRole) {
+      throw createError('Please use the correct app for your role', 403)
+    }
+
+    let shopId: string | undefined
+    if (user.role === 'shop_owner') {
+      const shopResult = await query('SELECT id FROM shops WHERE owner_id = $1 LIMIT 1', [user.id])
+      if (shopResult.rows.length > 0) shopId = shopResult.rows[0].id
+    }
+
+    const tokens = generateTokens({ userId: user.id, role: user.role, shopId })
 
     res.json({
       success: true,

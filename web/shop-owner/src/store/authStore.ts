@@ -9,6 +9,7 @@ interface AuthState {
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
   loginWithTokens: (user: User, accessToken: string, refreshToken: string) => void
+  loginWithPhone: (idToken: string) => Promise<void>
   logout: () => void
   setUser: (user: User) => void
 }
@@ -25,6 +26,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem('refreshToken', refreshToken)
     set({ user, accessToken, isAuthenticated: true })
     // Connect socket and join personal room so real-time events work
+    connectSocket(user.id)
+  },
+
+  loginWithPhone: async (idToken) => {
+    const res = await authApi.firebasePhone(idToken)
+    const { user, accessToken, refreshToken } = res.data.data
+    localStorage.setItem('accessToken', accessToken)
+    localStorage.setItem('refreshToken', refreshToken)
+    set({ user, accessToken, isAuthenticated: true })
     connectSocket(user.id)
   },
 

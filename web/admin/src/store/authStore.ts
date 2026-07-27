@@ -22,6 +22,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user, accessToken, refreshToken, isAuthenticated: true })
   },
 
+  loginWithPhone: async (idToken) => {
+    const res = await authApi.firebasePhone(idToken)
+    const { user, accessToken, refreshToken } = res.data.data
+    localStorage.setItem('accessToken', accessToken)
+    localStorage.setItem('refreshToken', refreshToken)
+    set({ user, accessToken, refreshToken, isAuthenticated: true })
+  },
+
   logout: () => {
     authApi.logout().catch(() => {})
     localStorage.removeItem('accessToken')

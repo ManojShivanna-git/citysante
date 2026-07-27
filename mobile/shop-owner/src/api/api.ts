@@ -60,10 +60,13 @@ api.interceptors.response.use(
 )
 
 export const authApi = {
-  login:        (email: string, password: string) => api.post('/auth/login', { email, password }),
-  me:           () => api.get('/auth/me'),
-  logout:       () => api.post('/auth/logout'),
-  saveFcmToken: (fcm_token: string) => api.post('/auth/fcm-token', { fcm_token }),
+  login:          (email: string, password: string) => api.post('/auth/login', { email, password }),
+  sendEmailOTP:   (email: string)                   => api.post('/auth/send-email-otp', { email }),
+  verifyEmailOTP: (email: string, otp: string)      => api.post('/auth/verify-email-otp', { email, otp }),
+  firebasePhone:  (idToken: string)                 => api.post('/auth/firebase-phone', { idToken, expectedRole: 'shop_owner' }),
+  me:             () => api.get('/auth/me'),
+  logout:         () => api.post('/auth/logout'),
+  saveFcmToken:   (fcm_token: string) => api.post('/auth/fcm-token', { fcm_token }),
 }
 
 export const shopApi = {
