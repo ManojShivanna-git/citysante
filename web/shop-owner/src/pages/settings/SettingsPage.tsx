@@ -4,7 +4,7 @@ import { shopApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
 import toast from 'react-hot-toast'
 
-const API = import.meta.env.VITE_API_URL?.replace('/api', '') || ''
+const API = (import.meta.env.VITE_API_URL || '/api').replace(/\/api$/, '')
 
 export default function SettingsPage() {
   const { shop, setShop } = useShopStore()
