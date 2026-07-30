@@ -20,7 +20,9 @@ import { AuthRequest } from '../types'
 // folder seed.ts / the generated placeholder images live in.
 
 export function resolveUploadType(req: AuthRequest): 'products' | 'categories' | 'requests' | 'shops' {
-  if (req.query.type === 'shops') return 'shops'
+  // Shop image uploads (logo / cover) must go to the shops folder
+  if (req.query.type === 'shops' || req.query.type === 'logo' || req.query.type === 'cover') return 'shops'
+  // All other shop_owner uploads (product requests) go to requests folder
   if (req.user?.role === 'shop_owner') return 'requests'
   if (req.query.type === 'categories') return 'categories'
   if (req.query.type === 'requests') return 'requests'
