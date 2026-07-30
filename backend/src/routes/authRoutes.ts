@@ -11,31 +11,36 @@ import { authenticate } from '../middleware/auth'
 const router = Router()
 
 // ── Rate limiters ────────────────────────────────────────────────────────
-// OTP send: max 5 requests per 15 min per IP
+const isDev = process.env.NODE_ENV !== 'production'
+
+// OTP send: relaxed during testing, strict in production
 const otpSendLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: isDev ? 100 : 50,  // loosen for testing; tighten to 5 before public launch
   message: { success: false, message: 'Too many OTP requests. Try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isDev,   // bypass entirely in dev
 })
 
-// OTP verify: max 10 attempts per 15 min per IP
+// OTP verify: relaxed for testing
 const otpVerifyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 100,
   message: { success: false, message: 'Too many attempts. Try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isDev,
 })
 
-// Login: max 10 attempts per 15 min per IP
+// Login: relaxed for testing
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 100,
   message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isDev,
 })
 
 // ── Firebase Phone Auth (customers) ─────────────────────────────────────
