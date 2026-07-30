@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { Search, Plus, Minus, Zap, DollarSign, List, Clock, MapPin, RotateCcw, TrendingUp, Sparkles } from 'lucide-react'
-import { productApi, orderApi } from '../../services/api'
+import { productApi, orderApi, getImgUrl } from '../../services/api'
 import { useLocationStore } from '../../store/locationStore'
 import { useCartStore } from '../../store/cartStore'
 import { useAuthStore } from '../../store/authStore'
@@ -23,8 +23,8 @@ function ProductCard({ r, getQty, onAdd, onUpdate }: {
   return (
     <div className="card p-3.5 flex items-center gap-3 hover:shadow-md transition-shadow">
       <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border border-gray-100">
-        {r.image_url
-          ? <img src={r.image_url} alt={r.product_name} className="w-full h-full object-cover" />
+        {getImgUrl(r.image_url)
+          ? <img src={getImgUrl(r.image_url)!} alt={r.product_name} className="w-full h-full object-cover" />
           : <span className="text-2xl">📦</span>
         }
       </div>

@@ -3,6 +3,14 @@ import toast from 'react-hot-toast'
 
 const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/api', timeout: 15000 })
 
+// Prepend API host to relative image paths returned by the backend (e.g. /uploads/shops/...)
+const API_HOST = (import.meta.env.VITE_API_URL || '/api').replace(/\/api$/, '')
+export const getImgUrl = (url?: string | null): string | null => {
+  if (!url) return null
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  return `${API_HOST}${url}`
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('cs_token')
   if (token) config.headers.Authorization = `Bearer ${token}`

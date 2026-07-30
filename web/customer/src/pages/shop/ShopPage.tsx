@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Star, Clock, MapPin, Plus, Minus, ShoppingCart } from 'lucide-react'
-import { shopApi } from '../../services/api'
+import { shopApi, getImgUrl } from '../../services/api'
 import { useCartStore } from '../../store/cartStore'
 import type { ShopProduct } from '../../types'
 import { Link } from 'react-router-dom'
@@ -79,8 +79,8 @@ function ProductRow({
     >
       {/* Image */}
       <div className="w-16 h-16 bg-gray-50 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border border-gray-100">
-        {p.image_url
-          ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+        {getImgUrl(p.image_url)
+          ? <img src={getImgUrl(p.image_url)!} alt={p.name} className="w-full h-full object-cover" />
           : <span className="text-2xl">📦</span>
         }
       </div>
@@ -201,8 +201,8 @@ export default function ShopPage() {
 
         <div className="relative flex items-center gap-4">
           <div className="w-18 h-18 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-3xl shrink-0 border border-white/20 shadow-lg w-16 h-16">
-            {shop.logo_url
-              ? <img src={shop.logo_url} alt={shop.name} className="w-full h-full object-cover rounded-2xl" />
+            {getImgUrl(shop.logo_url)
+              ? <img src={getImgUrl(shop.logo_url)!} alt={shop.name} className="w-full h-full object-cover rounded-2xl" />
               : '🏪'}
           </div>
           <div className="min-w-0">

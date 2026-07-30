@@ -4,7 +4,7 @@ import {
   Zap, DollarSign, List, MapPin, Star, Clock, Search,
   ShoppingCart, Tag, Plus, Minus, ChevronRight, Package,
 } from 'lucide-react'
-import { shopApi, productApi } from '../../services/api'
+import { shopApi, productApi, getImgUrl } from '../../services/api'
 import { useLocationStore } from '../../store/locationStore'
 import { useCartStore } from '../../store/cartStore'
 import { useAuthStore } from '../../store/authStore'
@@ -132,9 +132,9 @@ function ProductCard({ product, mode }: { product: BrowseProduct; mode: string }
     <div className="card-hover overflow-hidden group flex flex-col">
       {/* Image */}
       <div className="h-36 bg-gray-50 relative flex items-center justify-center overflow-hidden">
-        {product.image_url ? (
+        {getImgUrl(product.image_url) ? (
           <img
-            src={product.image_url}
+            src={getImgUrl(product.image_url)!}
             alt={product.product_name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
@@ -236,8 +236,8 @@ function ShopCard({ shop }: { shop: Shop }) {
     <Link to={`/shop/${shop.id}`} className="card-hover overflow-hidden block group">
       {/* Cover */}
       <div className="h-36 bg-gradient-to-br from-red-50 via-yellow-50 to-amber-50 relative overflow-hidden">
-        {shop.logo_url ? (
-          <img src={shop.logo_url} alt={shop.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        {getImgUrl(shop.logo_url) ? (
+          <img src={getImgUrl(shop.logo_url)!} alt={shop.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-5xl">🏪</div>
         )}
