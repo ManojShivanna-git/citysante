@@ -31,7 +31,7 @@ export const getNearbyShops = async (req: Request, res: Response, next: NextFunc
         s.id, s.name, s.description, s.logo_url, s.cover_url,
         s.city, s.delivery_fee, s.minimum_order, s.delivery_time_min,
         s.delivery_time_max, s.rating, s.total_reviews, s.is_open,
-        s.zone_id,
+        s.zone_id, s.zone_category,
         ARRAY_AGG(DISTINCT sb.badge) FILTER (WHERE sb.is_active = TRUE) AS badges,
         ${haversine} AS distance
       FROM shops s

@@ -17,7 +17,11 @@ interface ShopDetail {
   lat: number | null; lng: number | null
   delivery_fee: number; minimum_order: number; delivery_time_min: number
   delivery_time_max: number; rating: number; total_reviews: number
-  is_open: boolean; badges: string[]; menu: Menu[]
+  is_open: boolean; badges: string[]; menu: Menu[]; zone_category: string
+}
+
+const CATEGORY_EMOJI: Record<string, string> = {
+  grocery: '🛒', vegetable: '🥦', dairy: '🥛',
 }
 
 declare global { interface Window { L: any } }
@@ -203,7 +207,7 @@ export default function ShopPage() {
           <div className="w-18 h-18 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-3xl shrink-0 border border-white/20 shadow-lg w-16 h-16">
             {getImgUrl(shop.logo_url)
               ? <img src={getImgUrl(shop.logo_url)!} alt={shop.name} className="w-full h-full object-cover rounded-2xl" />
-              : '🏪'}
+              : <span className="text-3xl">{CATEGORY_EMOJI[shop.zone_category] ?? '🏪'}</span>}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">

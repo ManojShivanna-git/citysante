@@ -231,15 +231,27 @@ function ProductCard({ product, mode }: { product: BrowseProduct; mode: string }
 
 // ─── Shop Card ────────────────────────────────────────────────────────────────
 
+const CATEGORY_EMOJI: Record<string, { emoji: string; bg: string }> = {
+  grocery:   { emoji: '🛒', bg: 'from-orange-50 via-amber-50  to-yellow-50' },
+  vegetable: { emoji: '🥦', bg: 'from-green-50  via-emerald-50 to-teal-50'  },
+  dairy:     { emoji: '🥛', bg: 'from-blue-50   via-sky-50    to-cyan-50'   },
+}
+
 function ShopCard({ shop }: { shop: Shop }) {
+  const cat = CATEGORY_EMOJI[shop.zone_category] ?? { emoji: '🏪', bg: 'from-red-50 via-yellow-50 to-amber-50' }
+
   return (
     <Link to={`/shop/${shop.id}`} className="card-hover overflow-hidden block group">
       {/* Cover */}
-      <div className="h-36 bg-gradient-to-br from-red-50 via-yellow-50 to-amber-50 relative overflow-hidden">
+      <div className={`h-36 bg-gradient-to-br ${cat.bg} relative overflow-hidden`}>
         {getImgUrl(shop.logo_url) ? (
           <img src={getImgUrl(shop.logo_url)!} alt={shop.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-5xl">🏪</div>
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-7xl group-hover:scale-110 transition-transform duration-300 drop-shadow-sm select-none">
+              {cat.emoji}
+            </span>
+          </div>
         )}
 
         {/* Closed overlay */}
