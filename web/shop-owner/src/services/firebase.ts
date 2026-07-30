@@ -12,3 +12,8 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
 export const auth = getAuth(app)
+
+// Disable reCAPTCHA verification in local development so OTP works without it
+if (import.meta.env.DEV) {
+  auth.settings.appVerificationDisabledForTesting = true
+}

@@ -25,7 +25,7 @@ export const authApi = {
   login:          (email: string, password: string) => api.post('/auth/login', { email, password }),
   sendEmailOTP:   (email: string)                   => api.post('/auth/send-email-otp', { email }),
   verifyEmailOTP: (email: string, otp: string)      => api.post('/auth/verify-email-otp', { email, otp }),
-  firebasePhone:  (idToken: string)                 => api.post('/auth/firebase-phone', { idToken, expectedRole: 'shop_owner' }),
+  firebasePhone:  (idToken: string, name?: string)  => api.post('/auth/firebase-phone', { idToken, name, expectedRole: 'shop_owner' }),
   register: (data: { name: string; email: string; phone: string; password: string }) =>
     api.post('/auth/register', { ...data, role: 'shop_owner' }),
   me:     () => api.get('/auth/me'),

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Store, MapPin, Phone, Clock, ChevronRight } from 'lucide-react'
+import { Store, MapPin, Phone, Clock, ChevronRight, Camera } from 'lucide-react'
 import { shopApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
 import { useAuthStore } from '../../store/authStore'
@@ -43,6 +43,9 @@ export default function RegisterShopPage() {
   const [step, setStep]   = useState(1)
   const [saving, setSaving] = useState(false)
   const [mapsReady, setMapsReady] = useState(!!(window as any).google?.maps)
+  const [logoFile, setLogoFile]     = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     name: '', description: '', phone: '',
     address: '', city: '', state: '', pincode: '',
@@ -112,6 +115,13 @@ export default function RegisterShopPage() {
     }
   }, [step, mapsReady])
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoFile(file)
+    setLogoPreview(URL.createObjectURL(file))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.lat || !form.lng) {
@@ -130,7 +140,17 @@ export default function RegisterShopPage() {
         delivery_time_max: parseInt(form.delivery_time_max)   || 45,
       }
       const res = await shopApi.registerShop(payload)
-      setShop(res.data.data)
+      const shop = res.data.data
+      setShop(shop)
+      // Upload logo if one was selected
+      if (logoFile) {
+        try {
+          const imgRes = await shopApi.uploadImage(logoFile, 'logo')
+          setShop({ ...shop, ...imgRes.data.data })
+        } catch {
+          toast.error('Shop registered but logo upload failed. You can add it in Settings.')
+        }
+      }
       toast.success('Shop registered! Waiting for admin approval.')
       navigate('/dashboard')
     } catch {
@@ -178,6 +198,35 @@ export default function RegisterShopPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Shop Name *</label>
                 <input className="input" placeholder="e.g. Green Fresh Groceries"
                   value={form.name} onChange={(e) => set('name', e.target.value)} required />
+              </div>
+
+              {/* Shop Logo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Shop Logo (optional)</label>
+                <div className="flex items-center gap-4">
+                  <div
+                    onClick={() => logoInputRef.current?.click()}
+                    className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors overflow-hidden shrink-0"
+                  >
+                    {logoPreview
+                      ? <img src={logoPreview} alt="Logo preview" className="w-full h-full object-cover" />
+                      : <Camera size={24} className="text-gray-400" />
+                    }
+                  </div>
+                  <div>
+                    <button type="button" onClick={() => logoInputRef.current?.click()}
+                      className="text-sm font-medium text-brand-600 hover:underline">
+                      {logoPreview ? 'Change logo' : 'Upload logo'}
+                    </button>
+                    <p className="text-xs text-gray-400 mt-1">PNG, JPG or WebP · Max 5MB</p>
+                    {logoPreview && (
+                      <button type="button" onClick={() => { setLogoFile(null); setLogoPreview(null) }}
+                        className="text-xs text-red-400 hover:underline mt-1">Remove</button>
+                    )}
+                  </div>
+                </div>
+                <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp"
+                  className="hidden" onChange={handleLogoChange} />
               </div>
 
               <div>

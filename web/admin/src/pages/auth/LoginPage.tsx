@@ -24,6 +24,7 @@ export default function LoginPage() {
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current)
     recaptchaRef.current?.clear()
+    recaptchaRef.current = null
   }, [])
 
   const startTimer = () => {
@@ -34,14 +35,18 @@ export default function LoginPage() {
     }, 1000)
   }
 
-  const getRecaptcha = () => {
+  const getRecaptcha = async () => {
     if (!recaptchaRef.current) {
       recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' })
     }
+    await recaptchaRef.current.render()
     return recaptchaRef.current
   }
 
-  const resetRecaptcha = () => { recaptchaRef.current?.clear(); recaptchaRef.current = null }
+  const resetRecaptcha = () => {
+    recaptchaRef.current?.clear()
+    recaptchaRef.current = null
+  }
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,7 +54,7 @@ export default function LoginPage() {
     if (!/^[6-9]\d{9}$/.test(cleaned)) { toast.error('Enter a valid 10-digit mobile number'); return }
     setLoading(true)
     try {
-      const result = await signInWithPhoneNumber(auth, '+91' + cleaned, getRecaptcha())
+      const result = await signInWithPhoneNumber(auth, '+91' + cleaned, await getRecaptcha())
       confirmRef.current = result
       setStep('otp')
       startTimer()
@@ -87,7 +92,7 @@ export default function LoginPage() {
     setLoading(true)
     resetRecaptcha()
     try {
-      const result = await signInWithPhoneNumber(auth, '+91' + phone.replace(/\D/g, ''), getRecaptcha())
+      const result = await signInWithPhoneNumber(auth, '+91' + phone.replace(/\D/g, ''), await getRecaptcha())
       confirmRef.current = result
       setOtp(''); startTimer()
       toast.success('OTP resent!')

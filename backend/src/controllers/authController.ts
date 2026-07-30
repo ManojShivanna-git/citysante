@@ -131,17 +131,22 @@ export const firebasePhoneLogin = async (req: Request, res: Response, next: Next
     let isNewUser = false
 
     if (userResult.rows.length === 0) {
-      if (expectedRole !== 'customer') {
-        // Shop owners and riders must have accounts created by admin
-        throw createError('No account found with this number. Contact your admin.', 404)
+      if (expectedRole === 'rider') {
+        // Riders must be created by admin/shop owner
+        throw createError('No account found with this number. Contact your shop admin.', 404)
       }
-      // Auto-create customer account
+      if (expectedRole !== 'customer' && expectedRole !== 'shop_owner') {
+        throw createError('No account found with this number.', 404)
+      }
+      // Auto-create customer or shop_owner account
+      const role = expectedRole === 'shop_owner' ? 'shop_owner' : 'customer'
+      const defaultName = role === 'shop_owner' ? 'Shop Owner' : 'Isanthe User'
       isNewUser = true
       const newUser = await query(
         `INSERT INTO users (name, phone, role, is_verified, is_active)
-         VALUES ($1, $2, 'customer', TRUE, TRUE)
+         VALUES ($1, $2, $3, TRUE, TRUE)
          RETURNING id, name, email, phone, role, is_active, is_verified, profile_photo_url`,
-        [name?.trim() || 'Isanthe User', phone]
+        [name?.trim() || defaultName, phone, role]
       )
       userResult = newUser
     } else {
