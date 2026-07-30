@@ -41,10 +41,11 @@ export default function RegisterPage() {
     }, 1000)
   }
 
-  const getRecaptcha = () => {
+  const getRecaptcha = async () => {
     if (!recaptchaRef.current) {
       recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' })
     }
+    await recaptchaRef.current.render()
     return recaptchaRef.current
   }
 
@@ -59,7 +60,7 @@ export default function RegisterPage() {
     // Check if phone already registered
     setLoading(true)
     try {
-      const result = await signInWithPhoneNumber(auth, '+91' + cleaned, getRecaptcha())
+      const result = await signInWithPhoneNumber(auth, '+91' + cleaned, await getRecaptcha())
       confirmRef.current = result
       setStep('otp')
       startTimer()

@@ -86,7 +86,7 @@ export default function LoginPage() {
     setLoading(true)
     resetRecaptcha()
     try {
-      const result = await signInWithPhoneNumber(auth, '+91' + phone.replace(/\D/g, ''), getRecaptcha())
+      const result = await signInWithPhoneNumber(auth, '+91' + phone.replace(/\D/g, ''), await getRecaptcha())
       confirmRef.current = result
       setOtp(''); startTimer()
       toast.success('OTP resent!')
