@@ -1,97 +1,54 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
-import { auth } from '../../services/firebase'
-import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth'
+import api from '../../services/api'
 import toast from 'react-hot-toast'
+
+// ─── TODO: Re-enable Firebase Phone Auth after Fast2SMS DLT is approved ──────
+// import { auth } from '../../services/firebase'
+// import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth'
+// Replace the fake OTP flow below with the real Firebase flow (see git history).
+// The /auth/dev-phone-login backend endpoint must also be removed before launch.
 
 type Step = 'phone' | 'otp'
 
 export default function LoginPage() {
-  const { loginWithPhone } = useAuthStore()
+  const { loginWithTokens } = useAuthStore()
   const navigate = useNavigate()
 
-  const [step, setStep]   = useState<Step>('phone')
-  const [phone, setPhone] = useState('')
-  const [otp, setOtp]     = useState('')
+  const [step, setStep]     = useState<Step>('phone')
+  const [phone, setPhone]   = useState('')
+  const [otp, setOtp]       = useState('')
   const [loading, setLoading] = useState(false)
-  const [timer, setTimer] = useState(0)
 
-  const confirmRef   = useRef<ConfirmationResult | null>(null)
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null)
-  const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current)
-    recaptchaRef.current?.clear()
-    recaptchaRef.current = null
-  }, [])
-
-  const startTimer = () => {
-    setTimer(30)
-    if (timerRef.current) clearInterval(timerRef.current)
-    timerRef.current = setInterval(() => {
-      setTimer((t) => { if (t <= 1) { clearInterval(timerRef.current!); return 0 } return t - 1 })
-    }, 1000)
-  }
-
-  const getRecaptcha = async () => {
-    if (!recaptchaRef.current) {
-      recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' })
-    }
-    await recaptchaRef.current.render()
-    return recaptchaRef.current
-  }
-
-  const resetRecaptcha = () => {
-    recaptchaRef.current?.clear()
-    recaptchaRef.current = null
-  }
-
-  const handleSendOTP = async (e: React.FormEvent) => {
+  // ── TEMP: Just show OTP step — no SMS sent (hardcoded OTP is 123456) ──
+  const handleSendOTP = (e: React.FormEvent) => {
     e.preventDefault()
     const cleaned = phone.replace(/\D/g, '')
     if (!/^[6-9]\d{9}$/.test(cleaned)) { toast.error('Enter a valid 10-digit Indian mobile number'); return }
-    setLoading(true)
-    try {
-      const result = await signInWithPhoneNumber(auth, '+91' + cleaned, await getRecaptcha())
-      confirmRef.current = result
-      setStep('otp')
-      startTimer()
-      toast.success('OTP sent!')
-    } catch (err: any) {
-      console.error('Send OTP error:', err)
-      resetRecaptcha()
-      toast.error(err?.message?.includes('too-many-requests') ? 'Too many attempts. Try later.' : 'Failed to send OTP.')
-    } finally { setLoading(false) }
+    setStep('otp')
+    toast('Enter OTP: 123456', { icon: '🔑' })
   }
 
+  // ── TEMP: Verify OTP against /auth/dev-phone-login ──
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     if (otp.length !== 6) { toast.error('Enter the 6-digit OTP'); return }
-    if (!confirmRef.current) { toast.error('Session expired. Resend OTP.'); return }
     setLoading(true)
     try {
-      const credential = await confirmRef.current.confirm(otp)
-      const idToken = await credential.user.getIdToken()
-      await loginWithPhone(idToken)
+      const res = await api.post('/auth/dev-phone-login', {
+        phone: phone.replace(/\D/g, ''),
+        otp,
+        expectedRole: 'shop_owner',
+      })
+      const { user, accessToken, refreshToken } = res.data.data
+      loginWithTokens(user, accessToken, refreshToken)
       navigate('/dashboard')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || err?.message || 'Invalid OTP')
-    } finally { setLoading(false) }
-  }
-
-  const handleResend = async () => {
-    if (timer > 0) return
-    setLoading(true)
-    resetRecaptcha()
-    try {
-      const result = await signInWithPhoneNumber(auth, '+91' + phone.replace(/\D/g, ''), await getRecaptcha())
-      confirmRef.current = result
-      setOtp(''); startTimer()
-      toast.success('OTP resent!')
-    } catch { resetRecaptcha(); toast.error('Failed to resend OTP') }
-    finally { setLoading(false) }
+    } catch {
+      // error shown by interceptor
+    } finally {
+      setLoading(false)
+    }
   }
 
   const inputCls = 'w-full px-3 py-2.5 rounded-lg bg-gray-700 border border-gray-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
@@ -99,7 +56,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div id="recaptcha-container" />
 
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
@@ -123,7 +79,7 @@ export default function LoginPage() {
                 <p className="text-xs text-gray-500 mt-1">Must be registered with your shop account</p>
               </div>
               <button type="submit" disabled={loading} className={btnCls}>
-                {loading ? 'Sending OTP...' : 'Send OTP'}
+                Continue
               </button>
               <p className="text-center text-sm text-gray-400">
                 New shop owner?{' '}
@@ -135,9 +91,9 @@ export default function LoginPage() {
           {step === 'otp' && (
             <form onSubmit={handleVerifyOTP} className="space-y-4">
               <div className="text-center">
-                <p className="text-gray-300 text-sm">OTP sent to</p>
+                <p className="text-gray-300 text-sm">Signing in as</p>
                 <p className="text-white font-medium text-sm mt-0.5">+91 {phone}</p>
-                <button type="button" onClick={() => { setStep('phone'); setOtp(''); resetRecaptcha() }}
+                <button type="button" onClick={() => { setStep('phone'); setOtp('') }}
                   className="text-brand-400 text-xs mt-1 hover:underline">Change number</button>
               </div>
               <div>
@@ -150,9 +106,9 @@ export default function LoginPage() {
               <button type="submit" disabled={loading || otp.length !== 6} className={btnCls}>
                 {loading ? 'Verifying...' : 'Verify & Sign In'}
               </button>
-              <button type="button" onClick={handleResend} disabled={timer > 0 || loading}
-                className="w-full text-sm text-gray-400 hover:text-brand-400 disabled:opacity-40 transition-colors">
-                {timer > 0 ? `Resend OTP in ${timer}s` : 'Resend OTP'}
+              <button type="button" onClick={() => { setOtp(''); toast('OTP is: 123456', { icon: '🔑' }) }}
+                className="w-full text-sm text-gray-400 hover:text-brand-400 transition-colors">
+                Resend OTP
               </button>
             </form>
           )}

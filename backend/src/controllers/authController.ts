@@ -478,6 +478,70 @@ export const verifyEmailOTP = async (req: Request, res: Response, next: NextFunc
   }
 }
 
+// ─── DEV ONLY: Temp phone login with hardcoded OTP 123456 ─────────────────
+// TODO: Remove this endpoint before public launch.
+//       Replace with Firebase phone auth (customer/shop-owner) once
+//       Fast2SMS DLT is approved and Firebase SMS reaches Indian numbers.
+
+export const devPhoneLogin = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { phone, otp, expectedRole = 'customer', name } = req.body
+
+    // Hardcoded OTP check — only 123456 is accepted
+    if (otp !== '123456') throw createError('Invalid OTP', 401)
+    if (!/^[6-9]\d{9}$/.test(phone)) throw createError('Invalid phone number', 400)
+
+    let userResult = await query(
+      `SELECT id, name, email, phone, role, is_active, is_verified, profile_photo_url
+       FROM users WHERE phone = $1`,
+      [phone]
+    )
+
+    let isNewUser = false
+
+    if (userResult.rows.length === 0) {
+      if (expectedRole === 'rider') {
+        throw createError('No account found with this number. Contact your shop admin.', 404)
+      }
+      const role = expectedRole === 'shop_owner' ? 'shop_owner' : 'customer'
+      const defaultName = role === 'shop_owner' ? 'Shop Owner' : 'Isanthe User'
+      isNewUser = true
+      const newUser = await query(
+        `INSERT INTO users (name, phone, role, is_verified, is_active)
+         VALUES ($1, $2, $3, TRUE, TRUE)
+         RETURNING id, name, email, phone, role, is_active, is_verified, profile_photo_url`,
+        [name?.trim() || defaultName, phone, role]
+      )
+      userResult = newUser
+    } else {
+      await query('UPDATE users SET last_login_at = NOW() WHERE phone = $1', [phone])
+    }
+
+    const user = userResult.rows[0]
+    if (!user.is_active) throw createError('Account suspended. Contact support.', 403)
+
+    if (expectedRole !== 'any' && user.role !== expectedRole) {
+      throw createError('Please use the correct app for your role', 403)
+    }
+
+    let shopId: string | undefined
+    if (user.role === 'shop_owner') {
+      const shopResult = await query('SELECT id FROM shops WHERE owner_id = $1 LIMIT 1', [user.id])
+      if (shopResult.rows.length > 0) shopId = shopResult.rows[0].id
+    }
+
+    const tokens = generateTokens({ userId: user.id, role: user.role, shopId })
+
+    res.json({
+      success: true,
+      message: isNewUser ? 'Account created successfully' : 'Login successful',
+      data: { user, isNewUser, ...tokens },
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
 // ─── Save FCM Token ───────────────────────────────────────────────────────
 
 export const saveFcmToken = async (req: AuthRequest, res: Response, next: NextFunction) => {

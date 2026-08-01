@@ -4,7 +4,7 @@ import {
   register, login, refreshToken, logout,
   getMe, updateProfile, changePassword,
   sendOTP, verifyOTP, resendOTP, saveFcmToken, firebasePhoneLogin,
-  sendEmailOTP, verifyEmailOTP,
+  sendEmailOTP, verifyEmailOTP, devPhoneLogin,
 } from '../controllers/authController'
 import { authenticate } from '../middleware/auth'
 
@@ -45,6 +45,10 @@ const loginLimiter = rateLimit({
 
 // ── Firebase Phone Auth (customers) ─────────────────────────────────────
 router.post('/firebase-phone', otpSendLimiter, firebasePhoneLogin)
+
+// ── DEV ONLY: Temp login with hardcoded OTP 123456 ───────────────────────
+// TODO: Remove before public launch
+router.post('/dev-phone-login', devPhoneLogin)
 
 // ── Phone OTP auth ───────────────────────────────────────────────────────
 router.post('/send-otp',       otpSendLimiter,   sendOTP)
