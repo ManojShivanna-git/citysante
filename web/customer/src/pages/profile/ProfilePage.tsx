@@ -100,7 +100,7 @@ export default function ProfilePage() {
 
       {/* Logout */}
       <button onClick={handleLogout}
-        className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border-2 border-red-100 text-red-500 hover:bg-red-50 transition-colors font-medium">
+        className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border-2 border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors font-medium">
         <LogOut size={18} /> Sign Out
       </button>
     </div>

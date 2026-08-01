@@ -119,27 +119,24 @@ function ProductRow({
           <RippleButton
             onClick={() => onAdd(p)}
             disabled={!shopOpen}
-            className="flex items-center gap-1 bg-brand-500 hover:bg-brand-600
+            className="flex items-center gap-1 bg-grad
                        text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors
-                       shadow-sm shadow-brand-200 disabled:opacity-40"
+                       shadow-sm disabled:opacity-40"
           >
             <Plus size={13} /> Add
           </RippleButton>
         ) : (
-          <div className="flex items-center gap-1.5 bg-brand-50 rounded-xl px-1.5 py-1">
+          <div className="flex items-center gap-1.5 bg-grad rounded-xl px-1.5 py-1">
             <RippleButton
               onClick={() => { updateQty(p.id, qty - 1); bumpQty() }}
-              rippleColor="rgba(220,38,38,0.25)"
-              className="w-7 h-7 bg-white border border-brand-200 text-brand-600 rounded-lg
-                         flex items-center justify-center hover:bg-brand-100 shadow-sm"
+              className="w-7 h-7 text-white rounded-lg flex items-center justify-center"
             >
               <Minus size={13} />
             </RippleButton>
-            <span ref={qtyRef} className="font-bold w-5 text-center text-sm text-brand-700">{qty}</span>
+            <span ref={qtyRef} className="font-bold w-5 text-center text-sm text-white">{qty}</span>
             <RippleButton
               onClick={() => { updateQty(p.id, qty + 1); bumpQty() }}
-              className="w-7 h-7 bg-brand-500 text-white rounded-lg
-                         flex items-center justify-center hover:bg-brand-600 shadow-sm"
+              className="w-7 h-7 text-white rounded-lg flex items-center justify-center"
             >
               <Plus size={13} />
             </RippleButton>
@@ -198,52 +195,53 @@ export default function ShopPage() {
   return (
     <div className="max-w-7xl mx-auto">
       {/* Shop header */}
-      <div className="bg-gradient-to-br from-red-600 via-red-500 to-yellow-400 text-white px-4 pt-6 pb-5 relative overflow-hidden">
-        {/* Decorative */}
-        <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full pointer-events-none" />
+      <div className="bg-[#c0392b] text-white px-4 pt-6 pb-0 relative overflow-hidden">
+        {/* Subtle circles */}
+        <div className="absolute -top-10 -right-10 w-44 h-44 bg-white/5 rounded-full pointer-events-none" />
+        <div className="absolute top-4 right-20 w-20 h-20 bg-white/5 rounded-full pointer-events-none" />
 
-        <div className="relative flex items-center gap-4">
-          <div className="w-18 h-18 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-3xl shrink-0 border border-white/20 shadow-lg w-16 h-16">
+        <div className="relative flex items-center gap-4 pb-5">
+          {/* Logo */}
+          <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center shrink-0 border border-white/20 shadow-md overflow-hidden">
             {getImgUrl(shop.logo_url)
-              ? <img src={getImgUrl(shop.logo_url)!} alt={shop.name} className="w-full h-full object-cover rounded-2xl" />
+              ? <img src={getImgUrl(shop.logo_url)!} alt={shop.name} className="w-full h-full object-cover" />
               : <span className="text-3xl">{CATEGORY_EMOJI[shop.zone_category] ?? '🏪'}</span>}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-extrabold leading-tight">{shop.name}</h1>
-              {shop.is_open
-                ? <span className="text-[10px] font-bold bg-green-400 text-green-900 px-2 py-0.5 rounded-full">OPEN</span>
-                : <span className="text-[10px] font-bold bg-red-400/80 text-white px-2 py-0.5 rounded-full">CLOSED</span>
-              }
-            </div>
+
+          {/* Info */}
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl font-extrabold leading-tight truncate">{shop.name}</h1>
             {shop.description && (
-              <p className="text-white/75 text-sm mt-0.5 line-clamp-1">{shop.description}</p>
+              <p className="text-white/65 text-xs mt-0.5 line-clamp-1">{shop.description}</p>
             )}
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-white/80">
-              <span className="flex items-center gap-1">
+            <div className="flex items-center gap-3 mt-2">
+              <span className="flex items-center gap-1 text-xs font-semibold">
                 <Star size={11} fill="currentColor" className="text-yellow-300" />
-                <span className="font-semibold text-white">{shop.rating || '—'}</span>
-                {shop.total_reviews > 0 && <span>({shop.total_reviews})</span>}
+                <span>{shop.rating || '—'}</span>
+                {shop.total_reviews > 0 && <span className="text-white/60">({shop.total_reviews})</span>}
               </span>
-              <span className="flex items-center gap-1">
+              <span className="text-white/30">·</span>
+              <span className="flex items-center gap-1 text-xs text-white/80">
                 <Clock size={11} />
                 {shop.delivery_time_min}–{shop.delivery_time_max} min
               </span>
+              <span className="text-white/30">·</span>
+              <span className="text-xs text-white/80">{shop.distance ? `${Number(shop.distance).toFixed(1)} km` : ''}</span>
             </div>
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="flex gap-2 mt-4 relative">
+        {/* Stats row — white cards on the bottom edge */}
+        <div className="flex gap-3 relative -mb-5">
           {[
-            { label: 'Delivery', value: `₹${shop.delivery_fee}` },
-            { label: 'Min order', value: `₹${shop.minimum_order}` },
-            { label: 'Reviews', value: shop.total_reviews || '—' },
-          ].map(({ label, value }) => (
-            <div key={label} className="flex-1 bg-white/15 backdrop-blur-sm rounded-xl px-3 py-2 text-center border border-white/10">
-              <div className="font-bold text-sm">{value}</div>
-              <div className="text-[10px] text-white/70 mt-0.5">{label}</div>
+            { label: 'Delivery fee', value: `₹${shop.delivery_fee}`, icon: '🛵' },
+            { label: 'Min order',    value: `₹${shop.minimum_order}`, icon: '🛒' },
+            { label: 'Reviews',      value: shop.total_reviews || '—', icon: '⭐' },
+          ].map(({ label, value, icon }) => (
+            <div key={label} className="flex-1 bg-white rounded-2xl px-3 py-3 text-center shadow-md">
+              <div className="text-base mb-0.5">{icon}</div>
+              <div className="font-bold text-gray-900 text-sm">{value}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">{label}</div>
             </div>
           ))}
         </div>
@@ -263,7 +261,7 @@ export default function ShopPage() {
 
       {/* Map */}
       {shop.lat && shop.lng && (
-        <div className="px-4 py-3 bg-white border-b border-gray-100">
+        <div className="px-4 pt-8 pb-3 bg-white border-b border-gray-100">
           <div className="flex items-center gap-1.5 mb-2 text-xs text-gray-500">
             <MapPin size={12} className="text-brand-600" />
             <span>{shop.address}, {shop.city}</span>
@@ -279,7 +277,7 @@ export default function ShopPage() {
 
       {/* Category tabs */}
       {shop.menu.length > 0 && (
-        <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-100 px-4">
+        <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-100 px-4 mt-6">
           <div className="flex gap-1.5 overflow-x-auto py-3 scrollbar-hide">
             {shop.menu.map((cat) => (
               <button

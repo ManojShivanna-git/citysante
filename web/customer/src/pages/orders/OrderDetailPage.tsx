@@ -69,7 +69,7 @@ function RiderMap({ lat, lng, updated_at, waiting, path = [] }: RiderMapProps) {
   const addRiderMarker = (L: any, m: any, rlat: number, rlng: number) => {
     const icon = L.divIcon({
       html: `<div style="
-        background:#dc2626;width:44px;height:44px;border-radius:50%;
+        background:#ea6c0a;width:44px;height:44px;border-radius:50%;
         display:flex;align-items:center;justify-content:center;
         font-size:22px;border:3px solid white;
         box-shadow:0 2px 14px rgba(0,0,0,.35);
@@ -99,7 +99,7 @@ function RiderMap({ lat, lng, updated_at, waiting, path = [] }: RiderMapProps) {
       if (!polylineRef.current) {
         // Animated dashed trail in brand red
         polylineRef.current = L.polyline(latLngs, {
-          color: '#dc2626', weight: 4, opacity: 0.75,
+          color: '#ea6c0a', weight: 4, opacity: 0.75,
           dashArray: '10, 6', lineJoin: 'round',
         }).addTo(mapObj.current)
 
@@ -172,7 +172,7 @@ function RiderMap({ lat, lng, updated_at, waiting, path = [] }: RiderMapProps) {
         {!waiting && path.length > 1 && (
           <div className="absolute bottom-3 left-3 z-[9999] bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow text-xs flex flex-col gap-1 border border-gray-100">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-0 border-t-2 border-dashed border-red-500 mt-px" />
+              <div className="w-4 h-0 border-t-2 border-dashed border-brand-500 mt-px" />
               <span className="text-gray-600">Rider path</span>
             </div>
             <div className="flex items-center gap-2">
@@ -180,7 +180,7 @@ function RiderMap({ lat, lng, updated_at, waiting, path = [] }: RiderMapProps) {
               <span className="text-gray-600">Pickup point</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-600 border-2 border-white shadow-sm" />
+              <div className="w-3 h-3 rounded-full bg-brand-600 border-2 border-white shadow-sm" />
               <span className="text-gray-600">Current position</span>
             </div>
           </div>

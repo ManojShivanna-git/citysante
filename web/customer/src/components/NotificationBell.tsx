@@ -26,8 +26,8 @@ function NotifIcon({ type }: { type: string }) {
   }
   if (type === 'payment_due' || type === 'shop_suspended') {
     return (
-      <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-        <CreditCard size={16} className="text-red-500" />
+      <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <CreditCard size={16} className="text-brand-500" />
       </div>
     )
   }

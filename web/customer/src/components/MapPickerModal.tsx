@@ -322,7 +322,7 @@ export default function MapPickerModal({ open, onClose, onConfirm }: Props) {
           {/* Balloon circle */}
           <div style={{
             width: 54, height: 54, borderRadius: '50%',
-            backgroundColor: '#dc2626',
+            backgroundColor: '#ea6c0a',
             border: '3px solid #fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 4px 16px rgba(220,38,38,0.45)',
@@ -339,7 +339,7 @@ export default function MapPickerModal({ open, onClose, onConfirm }: Props) {
             width: 0, height: 0,
             borderLeft: '11px solid transparent',
             borderRight: '11px solid transparent',
-            borderTop: '20px solid #dc2626',
+            borderTop: '20px solid #ea6c0a',
             marginTop: -3,
           }} />
         </div>

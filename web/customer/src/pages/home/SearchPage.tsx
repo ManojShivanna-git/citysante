@@ -65,20 +65,17 @@ function ProductCard({ r, getQty, onAdd, onUpdate }: {
               <Plus size={12} /> Add
             </RippleButton>
           ) : (
-            <div className="flex items-center gap-1 bg-brand-50 rounded-xl px-1 py-1">
+            <div className="flex items-center gap-1 bg-grad rounded-xl px-1 py-1">
               <RippleButton
                 onClick={() => onUpdate(r.id, qty - 1)}
-                rippleColor="rgba(220,38,38,0.2)"
-                className="w-6 h-6 bg-white border border-brand-200 text-brand-600 rounded-lg
-                           flex items-center justify-center hover:bg-brand-100 shadow-sm"
+                className="w-6 h-6 text-white rounded-lg flex items-center justify-center"
               >
                 <Minus size={11} />
               </RippleButton>
-              <span className="font-bold text-sm w-4 text-center text-brand-700">{qty}</span>
+              <span className="font-bold text-sm w-4 text-center text-white">{qty}</span>
               <RippleButton
                 onClick={() => onUpdate(r.id, qty + 1)}
-                className="w-6 h-6 bg-brand-500 text-white rounded-lg
-                           flex items-center justify-center hover:bg-brand-600 shadow-sm"
+                className="w-6 h-6 text-white rounded-lg flex items-center justify-center"
               >
                 <Plus size={11} />
               </RippleButton>

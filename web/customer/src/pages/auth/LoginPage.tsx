@@ -75,17 +75,17 @@ export default function LoginPage() {
     <div className="min-h-screen flex">
 
       {/* ── Left panel ── */}
-      <div className="hidden lg:flex flex-col flex-1 bg-gradient-to-br from-red-600 via-red-500 to-yellow-400 text-white p-12 relative overflow-hidden">
+      <div className="hidden lg:flex flex-col flex-1 text-white p-12 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 35%, #f97316 65%, #f59e0b 100%)' }}>
         <div className="absolute -top-16 -left-16 w-64 h-64 bg-white/10 rounded-full" />
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-16">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">🛒</div>
+            <div className="w-10 h-10 bg-white/25 rounded-xl flex items-center justify-center text-xl">🛒</div>
             <span className="font-extrabold text-2xl tracking-tight">Isanthe</span>
           </div>
           <h2 className="text-4xl font-extrabold leading-snug mb-4">Fresh groceries<br />at your door. 🚀</h2>
           <p className="text-white/80 text-lg leading-relaxed max-w-sm">
-            Order from local shops and get everything delivered in minutes.
+            Minutes away, every day.
           </p>
           <div className="mt-12 space-y-4">
             {[
@@ -108,7 +108,7 @@ export default function LoginPage() {
       {/* ── Right panel ── */}
       <div className="flex-1 lg:max-w-md flex flex-col items-center justify-center p-8 bg-[#fafaf9]">
         <div className="flex items-center gap-3 mb-10 lg:hidden">
-          <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-yellow-400 rounded-xl flex items-center justify-center text-xl shadow-md shadow-red-200">🛒</div>
+          <div className="w-10 h-10 bg-grad rounded-xl flex items-center justify-center text-xl shadow-md">🛒</div>
           <span className="font-extrabold text-2xl">Isanthe</span>
         </div>
 
@@ -159,7 +159,7 @@ export default function LoginPage() {
               </button>
 
               <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-red-100">📱</div>
+                <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-orange-100">📱</div>
                 <h1 className="text-2xl font-extrabold text-gray-900">Enter OTP</h1>
                 <p className="text-gray-500 text-sm mt-2">
                   For <span className="font-semibold text-gray-700">+91 {phone}</span>
@@ -175,7 +175,7 @@ export default function LoginPage() {
                     maxLength={6}
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full h-16 rounded-xl border-2 border-gray-200 text-center text-3xl font-bold outline-none tracking-widest focus:border-red-400 bg-white transition-all"
+                    className="w-full h-16 rounded-xl border-2 border-gray-200 text-center text-3xl font-bold outline-none tracking-widest focus:border-orange-400 bg-white transition-all"
                     placeholder="000000"
                     autoFocus
                   />
@@ -205,7 +205,7 @@ export default function LoginPage() {
               <p className="text-center text-sm text-gray-500 mt-6">
                 Didn't receive it?{' '}
                 <button type="button" onClick={handleResend}
-                  className="font-bold text-red-500 hover:text-red-600 transition-colors">
+                  className="font-bold text-brand-500 hover:text-brand-600 transition-colors">
                   Resend OTP
                 </button>
               </p>

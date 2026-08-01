@@ -80,7 +80,7 @@ export default function CartPage() {
                   <span className="w-5 text-center font-bold text-sm">{item.quantity}</span>
                   <RippleButton
                     onClick={() => updateQty(item.shopProductId, item.quantity + 1)}
-                    className="w-7 h-7 bg-brand-600 text-white rounded-lg flex items-center justify-center hover:bg-brand-700"
+                    className="w-7 h-7 bg-grad text-white rounded-lg flex items-center justify-center"
                   >
                     <Plus size={13} />
                   </RippleButton>
