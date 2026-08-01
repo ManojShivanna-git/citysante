@@ -10,6 +10,7 @@ interface AuthState {
   loginWithOTP:      (phone: string, otp: string, name?: string) => Promise<{ isNewUser: boolean }>
   loginWithEmailOTP: (email: string, otp: string) => Promise<void>
   loginWithPhone:    (idToken: string, name?: string) => Promise<{ isNewUser: boolean }>
+  loginWithTokens:   (user: User, accessToken: string, refreshToken: string) => void
   logout:            () => void
   setUser:           (u: User) => void
 }
@@ -50,6 +51,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   loginWithEmailOTP: async (email, otp) => {
     const res = await authApi.verifyEmailOTP(email, otp)
     const { user, accessToken, refreshToken } = res.data.data
+    localStorage.setItem('cs_token', accessToken)
+    if (refreshToken) localStorage.setItem('cs_refresh', refreshToken)
+    set({ user, isAuthenticated: true })
+    connectSocket(user.id)
+  },
+
+  loginWithTokens: (user, accessToken, refreshToken) => {
     localStorage.setItem('cs_token', accessToken)
     if (refreshToken) localStorage.setItem('cs_refresh', refreshToken)
     set({ user, isAuthenticated: true })
