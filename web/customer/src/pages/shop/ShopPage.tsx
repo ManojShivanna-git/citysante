@@ -18,6 +18,7 @@ interface ShopDetail {
   delivery_fee: number; minimum_order: number; delivery_time_min: number
   delivery_time_max: number; rating: number; total_reviews: number
   is_open: boolean; badges: string[]; menu: Menu[]; zone_category: string
+  distance?: number | null
 }
 
 const CATEGORY_EMOJI: Record<string, string> = {
