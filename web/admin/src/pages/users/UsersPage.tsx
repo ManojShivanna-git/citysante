@@ -64,20 +64,22 @@ export default function UsersPage({ defaultRole = '' }: { defaultRole?: string }
             value={search} onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && load()} />
         </div>
-        <SearchableSelect
-          className="w-44"
-          value={role}
-          onChange={setRole}
-          placeholder="All Roles"
-          searchable={false}
-          options={[
-            { value: '', label: 'All Roles' },
-            ...['customer', 'shop_owner', 'rider', 'admin', 'super_admin'].map((r) => ({
-              value: r,
-              label: r.replace('_', ' '),
-            })),
-          ]}
-        />
+        {!defaultRole && (
+          <SearchableSelect
+            className="w-44"
+            value={role}
+            onChange={setRole}
+            placeholder="All Roles"
+            searchable={false}
+            options={[
+              { value: '', label: 'All Roles' },
+              ...['customer', 'shop_owner', 'rider', 'admin', 'super_admin'].map((r) => ({
+                value: r,
+                label: r.replace('_', ' '),
+              })),
+            ]}
+          />
+        )}
       </div>
 
       <div className="card overflow-hidden">
