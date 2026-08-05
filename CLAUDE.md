@@ -382,7 +382,7 @@ VITE_GOOGLE_MAPS_API_KEY=AIzaSyDomYDJ9arv0ZY4DM-CYChxPTmV82QgBBw
 
 ### Pending
 - [ ] GitHub Secrets for CI/CD (GCP_VM_IP, GCP_VM_USER, GCP_SSH_PRIVATE_KEY, EXPO_TOKEN, FIREBASE_SERVICE_ACCOUNT, VITE_GOOGLE_MAPS_API_KEY)
-- [x] Fast2SMS OTP integration — DLT approved. Sender ID: `ISANTH`. VILPOWER Template ID: `1177178566687545340`. Fast2SMS Message ID: `222200`. smsService.ts uses DLT route. LoginPage.tsx (customer + shop-owner) uses real /auth/send-otp + /auth/verify-otp. **Action required on VM**: add `FAST2SMS_API_KEY=<your_key>` to `/var/www/isanthe/backend/.env` (get from Fast2SMS dashboard → API).
+- [x] Fast2SMS OTP integration — **LIVE & WORKING** (August 2026). Uses Smart OTP API (`POST /dev/otp/send`). OTP ID: `8d3c061aa8`. FAST2SMS_API_KEY set in backend .env on VM. Customer + shop-owner login both verified working. verify-otp endpoint accepts `expectedRole` param ('customer' or 'shop_owner').
 - [ ] End-to-end testing before soft launch
 
 ---
