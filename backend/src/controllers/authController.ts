@@ -55,11 +55,16 @@ export const sendOTP = async (req: Request, res: Response, next: NextFunction) =
 
 export const verifyOTP = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { phone, otp, name } = req.body
+    const { phone, otp, name, expectedRole = 'customer' } = req.body
     if (!phone || !otp) throw createError('Phone and OTP are required', 400)
 
+    const allowedRoles = ['customer', 'shop_owner']
+    if (!allowedRoles.includes(expectedRole)) {
+      throw createError('Invalid role', 400)
+    }
+
     const storedOTP = await redis.get(RedisKeys.otp(phone))
-    console.log(`🔍 verify-otp | phone="${phone}" submitted="${otp}" stored="${storedOTP}"`)
+    console.log(`🔍 verify-otp | phone="${phone}" submitted="${otp}" stored="${storedOTP}" expectedRole="${expectedRole}"`)
     if (!storedOTP) throw createError('OTP expired — please request a new one', 400)
     if (storedOTP !== otp) throw createError('Invalid OTP', 400)
 
@@ -75,13 +80,14 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
     let isNewUser = false
 
     if (userResult.rows.length === 0) {
-      // New user — auto-register
+      // New user — auto-register with expectedRole
       isNewUser = true
+      const defaultName = expectedRole === 'shop_owner' ? 'Shop Owner' : 'Isanthe User'
       const newUser = await query(
         `INSERT INTO users (name, phone, role, is_verified, is_active)
-         VALUES ($1, $2, 'customer', TRUE, TRUE)
+         VALUES ($1, $2, $3, TRUE, TRUE)
          RETURNING id, name, email, phone, role, is_active, is_verified, profile_photo_url`,
-        [name || 'Isanthe User', phone]
+        [name || defaultName, phone, expectedRole]
       )
       userResult = newUser
     } else {
@@ -92,7 +98,7 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
     const user = userResult.rows[0]
 
     if (!user.is_active) throw createError('Account is suspended. Please contact support.', 403)
-    if (user.role !== 'customer') throw createError('Please use the correct app for your role', 403)
+    if (user.role !== expectedRole) throw createError('Please use the correct app for your role', 403)
 
     const tokens = generateTokens({ userId: user.id, role: user.role })
 

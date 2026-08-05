@@ -40,6 +40,7 @@ export default function LoginPage() {
       const res = await api.post('/auth/verify-otp', {
         phone: phone.replace(/\D/g, ''),
         otp,
+        expectedRole: 'shop_owner',
       })
       const { user, accessToken, refreshToken } = res.data.data
       if (user.role !== 'shop_owner') {
