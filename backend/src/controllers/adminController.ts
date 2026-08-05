@@ -520,11 +520,20 @@ export const runBadgeComputeNow = async (req: Request, res: Response, next: Next
 
 export const getAllUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { role, page = 1, limit = 20 } = req.query
+    const { role, search, page = 1, limit = 20 } = req.query
     const offset = (Number(page) - 1) * Number(limit)
     const params: unknown[] = []
-    let where = ''
-    if (role) { where = 'WHERE role = $1'; params.push(role) }
+    const conditions: string[] = []
+
+    if (role)   { params.push(role);   conditions.push(`role = $${params.length}`) }
+    if (search) {
+      const s = `%${search}%`
+      params.push(s)
+      const n = params.length
+      conditions.push(`(name ILIKE $${n} OR phone ILIKE $${n} OR email ILIKE $${n})`)
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
     params.push(limit, offset)
 
     const result = await query(

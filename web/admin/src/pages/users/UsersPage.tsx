@@ -60,7 +60,7 @@ export default function UsersPage({ defaultRole = '' }: { defaultRole?: string }
       <div className="card p-4 flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input className="input pl-9" placeholder="Search by name or email..."
+          <input className="input pl-9" placeholder="Search by name, phone or email..."
             value={search} onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && load()} />
         </div>
