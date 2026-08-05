@@ -2,7 +2,8 @@ import https from 'https'
 
 const FAST2SMS_KEY         = process.env.FAST2SMS_API_KEY || ''
 const DLT_SENDER_ID        = 'ISANTH'
-const DLT_TEMPLATE_ID      = '1177178566687545340'   // VILPOWER Template ID
+const DLT_TEMPLATE_ID      = '222200'              // Fast2SMS Content Template Message ID
+const DLT_ENTITY_ID        = '1101098790000097305' // VILPOWER Entity ID
 const OTP_MESSAGE_TEMPLATE = 'Your Isanthe OTP is {otp}. Valid for 5 minutes. Do not share with anyone.'
 
 export const sendOTPSms = async (phone: string, otp: string): Promise<void> => {
@@ -15,13 +16,16 @@ export const sendOTPSms = async (phone: string, otp: string): Promise<void> => {
   const message = OTP_MESSAGE_TEMPLATE.replace('{otp}', otp)
 
   const body = JSON.stringify({
-    route:     'dlt',
-    sender_id: DLT_SENDER_ID,
+    route:      'dlt',
+    sender_id:  DLT_SENDER_ID,
     message,
-    flash:     0,
-    numbers:   phone,
-    dlt_te_id: DLT_TEMPLATE_ID,
+    flash:      0,
+    numbers:    phone,
+    dlt_te_id:  DLT_TEMPLATE_ID,
+    entity_id:  DLT_ENTITY_ID,
   })
+
+  console.log(`📱 Sending OTP SMS to ${phone} | body: ${body}`)
 
   return new Promise((resolve) => {
     const req = https.request(
