@@ -4,44 +4,48 @@ import { useAuthStore } from '../../store/authStore'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
-// ─── TODO: Re-enable Firebase Phone Auth after Fast2SMS DLT is approved ──────
-// import { auth } from '../../services/firebase'
-// import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth'
-// Replace the fake OTP flow below with the real Firebase flow (see git history).
-// The /auth/dev-phone-login backend endpoint must also be removed before launch.
-
 type Step = 'phone' | 'otp'
 
 export default function LoginPage() {
   const { loginWithTokens } = useAuthStore()
   const navigate = useNavigate()
 
-  const [step, setStep]     = useState<Step>('phone')
-  const [phone, setPhone]   = useState('')
-  const [otp, setOtp]       = useState('')
+  const [step, setStep]       = useState<Step>('phone')
+  const [phone, setPhone]     = useState('')
+  const [otp, setOtp]         = useState('')
   const [loading, setLoading] = useState(false)
+  const [sending, setSending] = useState(false)
 
-  // ── TEMP: Just show OTP step — no SMS sent (hardcoded OTP is 123456) ──
-  const handleSendOTP = (e: React.FormEvent) => {
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     const cleaned = phone.replace(/\D/g, '')
     if (!/^[6-9]\d{9}$/.test(cleaned)) { toast.error('Enter a valid 10-digit Indian mobile number'); return }
-    setStep('otp')
-    toast('Enter OTP: 123456', { icon: '🔑' })
+    setSending(true)
+    try {
+      await api.post('/auth/send-otp', { phone: cleaned })
+      setStep('otp')
+      toast.success('OTP sent to your number')
+    } catch {
+      // error shown by interceptor
+    } finally {
+      setSending(false)
+    }
   }
 
-  // ── TEMP: Verify OTP against /auth/dev-phone-login ──
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     if (otp.length !== 6) { toast.error('Enter the 6-digit OTP'); return }
     setLoading(true)
     try {
-      const res = await api.post('/auth/dev-phone-login', {
+      const res = await api.post('/auth/verify-otp', {
         phone: phone.replace(/\D/g, ''),
         otp,
-        expectedRole: 'shop_owner',
       })
       const { user, accessToken, refreshToken } = res.data.data
+      if (user.role !== 'shop_owner') {
+        toast.error('Please use the correct app for your role')
+        return
+      }
       loginWithTokens(user, accessToken, refreshToken)
       navigate('/dashboard')
     } catch {
@@ -78,8 +82,8 @@ export default function LoginPage() {
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Must be registered with your shop account</p>
               </div>
-              <button type="submit" disabled={loading} className={btnCls}>
-                Continue
+              <button type="submit" disabled={sending} className={btnCls}>
+                {sending ? 'Sending…' : 'Continue'}
               </button>
               <p className="text-center text-sm text-gray-400">
                 New shop owner?{' '}
@@ -106,8 +110,13 @@ export default function LoginPage() {
               <button type="submit" disabled={loading || otp.length !== 6} className={btnCls}>
                 {loading ? 'Verifying...' : 'Verify & Sign In'}
               </button>
-              <button type="button" onClick={() => { setOtp(''); toast('OTP is: 123456', { icon: '🔑' }) }}
-                className="w-full text-sm text-gray-400 hover:text-brand-400 transition-colors">
+              <button type="button" onClick={async () => {
+                setOtp('')
+                try {
+                  await api.post('/auth/resend-otp', { phone: phone.replace(/\D/g, '') })
+                  toast.success('OTP resent')
+                } catch {}
+              }} className="w-full text-sm text-gray-400 hover:text-brand-400 transition-colors">
                 Resend OTP
               </button>
             </form>

@@ -1,15 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
-import { ArrowLeft, ArrowRight, Phone, User } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Phone } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
-
-// ─── TODO: Re-enable Firebase Phone Auth after Fast2SMS DLT is approved ──────
-// import { auth } from '../../services/firebase'
-// import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth'
-// Replace the fake OTP flow below with the real Firebase flow (see git history).
-// The /auth/dev-phone-login backend endpoint must also be removed before launch.
 
 type Step = 'phone' | 'otp'
 
@@ -20,55 +14,56 @@ export default function LoginPage() {
   const [step, setStep]           = useState<Step>('phone')
   const [phone, setPhone]         = useState('')
   const [otp, setOtp]             = useState('')
-  const [name, setName]           = useState('')
-  const [isNewUser, setIsNewUser] = useState(false)
   const [loading, setLoading]     = useState(false)
-  const timerRef                  = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [sending, setSending]     = useState(false)
 
-  // ── TEMP: Just show OTP step — no SMS sent (hardcoded OTP is 123456) ──
-  const handleSendOTP = (e: React.FormEvent) => {
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     const cleaned = phone.replace(/\D/g, '')
     if (!/^[6-9]\d{9}$/.test(cleaned)) {
       toast.error('Enter a valid 10-digit Indian mobile number')
       return
     }
-    setStep('otp')
-    toast('Enter OTP: 123456', { icon: '🔑' })
+    setSending(true)
+    try {
+      await api.post('/auth/send-otp', { phone: cleaned })
+      setStep('otp')
+      toast.success('OTP sent to your number')
+    } catch {
+      // error shown by interceptor
+    } finally {
+      setSending(false)
+    }
   }
 
-  // ── TEMP: Verify OTP against /auth/dev-phone-login ──
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     if (otp.length !== 6) { toast.error('Enter the 6-digit OTP'); return }
     setLoading(true)
     try {
-      const res = await api.post('/auth/dev-phone-login', {
+      const res = await api.post('/auth/verify-otp', {
         phone: phone.replace(/\D/g, ''),
         otp,
-        expectedRole: 'customer',
-        name: name.trim() || undefined,
       })
-      const { user, accessToken, refreshToken, isNewUser: newUser } = res.data.data
+      const { user, accessToken, refreshToken, isNewUser } = res.data.data
       loginWithTokens(user, accessToken, refreshToken)
-      toast.success(newUser ? 'Welcome to Isanthe! 🎉' : 'Welcome back! 👋')
+      toast.success(isNewUser ? 'Welcome to Isanthe! 🎉' : 'Welcome back! 👋')
       navigate('/')
-    } catch (err: any) {
-      if (err?.response?.status === 403 && err?.response?.data?.data?.isNewUser === false) {
-        // New user — show name field
-        setIsNewUser(true)
-        toast('Enter your name to create an account')
-      }
-      // other errors shown by interceptor
+    } catch {
+      // error shown by interceptor
     } finally {
       setLoading(false)
     }
   }
 
-  const handleResend = () => {
-    if (timerRef.current) clearInterval(timerRef.current)
+  const handleResend = async () => {
     setOtp('')
-    toast('OTP is: 123456', { icon: '🔑' })
+    try {
+      await api.post('/auth/resend-otp', { phone: phone.replace(/\D/g, '') })
+      toast.success('OTP resent')
+    } catch {
+      // error shown by interceptor
+    }
   }
 
   return (
@@ -136,10 +131,11 @@ export default function LoginPage() {
                     </div>
                   </div>
                 </div>
-                <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-base">
-                  <span className="flex items-center justify-center gap-2">
-                    Continue <ArrowRight size={16} />
-                  </span>
+                <button type="submit" disabled={sending} className="btn-primary w-full py-3 text-base">
+                  {sending
+                    ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending…</span>
+                    : <span className="flex items-center justify-center gap-2">Continue <ArrowRight size={16} /></span>
+                  }
                 </button>
               </form>
 
@@ -153,7 +149,7 @@ export default function LoginPage() {
           {/* ── Step 2: OTP ── */}
           {step === 'otp' && (
             <>
-              <button onClick={() => { setStep('phone'); setOtp(''); setIsNewUser(false) }}
+              <button onClick={() => { setStep('phone'); setOtp('') }}
                 className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-8 transition-colors">
                 <ArrowLeft size={16} /> Change number
               </button>
@@ -180,19 +176,6 @@ export default function LoginPage() {
                     autoFocus
                   />
                 </div>
-
-                {isNewUser && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Your name <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input type="text" className="input pl-10 w-full" placeholder="e.g. Ravi Kumar"
-                        value={name} onChange={(e) => setName(e.target.value)} required />
-                    </div>
-                  </div>
-                )}
 
                 <button type="submit" disabled={loading || otp.length !== 6} className="btn-primary w-full py-3 text-base">
                   {loading

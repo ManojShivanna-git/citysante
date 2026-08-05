@@ -305,7 +305,7 @@ export default function ShopPage() {
       )}
 
       {/* Products */}
-      <div className="px-4 py-4 space-y-8 pb-32">
+      <div className="px-4 py-4 space-y-8 pb-40 sm:pb-32">
         {shop.menu.map((cat) => (
           <div key={cat.id} id={`cat-${cat.id}`}>
             <h2 className="section-title mb-3 flex items-center gap-2">
@@ -332,7 +332,7 @@ export default function ShopPage() {
 
       {/* Cart bar */}
       {cartCount > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 px-4 pb-4 pt-2 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none">
+        <div className="fixed bottom-14 sm:bottom-0 left-0 right-0 px-4 pb-4 pt-2 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none">
           <div className="max-w-7xl mx-auto">
             <Link
               to="/cart"

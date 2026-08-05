@@ -97,7 +97,7 @@ export default function Navbar() {
             <NotificationBell />
 
             {/* Cart */}
-            <Link to="/cart" className="relative flex flex-col items-center gap-0.5 px-3 py-2 text-gray-500 hover:text-red-600 transition-colors">
+            <Link to="/cart" className="relative hidden sm:flex flex-col items-center gap-0.5 px-3 py-2 text-gray-500 hover:text-red-600 transition-colors">
               <ShoppingCart size={19} />
               <span className="text-[10px] font-semibold hidden md:block">Cart</span>
               {count > 0 && (
@@ -113,7 +113,7 @@ export default function Navbar() {
             </Link>
 
             {/* Profile */}
-            <Link to={isAuthenticated ? '/profile' : '/login'} className="flex flex-col items-center gap-0.5 px-3 py-2 text-gray-500 hover:text-red-600 transition-colors">
+            <Link to={isAuthenticated ? '/profile' : '/login'} className="hidden sm:flex flex-col items-center gap-0.5 px-3 py-2 text-gray-500 hover:text-red-600 transition-colors">
               <User size={19} />
               <span className="text-[10px] font-semibold hidden md:block">Profile</span>
             </Link>

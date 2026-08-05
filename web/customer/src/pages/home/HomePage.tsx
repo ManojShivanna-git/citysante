@@ -350,7 +350,7 @@ export default function HomePage() {
   const productHeading = mode === 'cost' ? '💰 Lowest Prices' : mode === 'list' ? '🏪 All Shop Products' : '🔥 Popular Products'
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-6 sm:space-y-8">
 
       {/* ── Hero ── */}
       <div className="relative rounded-3xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 35%, #f97316 65%, #f59e0b 100%)' }}>
@@ -362,10 +362,10 @@ export default function HomePage() {
 
           {/* Left: text */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight tracking-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white leading-tight tracking-tight">
               Minutes away,
             </h1>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-yellow-200 leading-tight tracking-tight mb-3">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-yellow-200 leading-tight tracking-tight mb-3">
               every day.
             </h1>
             <p className="text-white/80 text-sm mb-6 max-w-xs leading-relaxed">
@@ -400,30 +400,30 @@ export default function HomePage() {
       {/* ── Shopping modes ── */}
       <div>
         <h2 className="section-title mb-3">How do you want to shop?</h2>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           {MODES.map(({ key, label, sub, icon: Icon, iconBg }) => (
             <button
               key={key}
               onClick={() => setMode(key as typeof mode)}
               className={clsx(
-                'flex items-center gap-3 p-4 rounded-2xl transition-all duration-200 text-left border shadow-sm',
+                'flex items-center gap-3 p-3.5 sm:p-4 rounded-2xl transition-all duration-200 text-left border shadow-sm',
                 mode === key
                   ? 'bg-white border-red-300 shadow-md shadow-red-100'
                   : 'bg-white border-gray-100 hover:border-red-200'
               )}
             >
-              <div className={clsx('w-14 h-14 rounded-full flex items-center justify-center shrink-0 shadow-md', iconBg)}>
-                <Icon size={24} className="text-white" />
+              <div className={clsx('w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shrink-0 shadow-md', iconBg)}>
+                <Icon size={20} className="text-white" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm text-gray-900 leading-tight">{label}</p>
                 <p className="text-xs mt-0.5 leading-tight text-gray-400">{sub}</p>
               </div>
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-colors"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 border transition-colors"
                 style={mode === key ? { background: 'linear-gradient(135deg, #dc2626, #f59e0b)', border: 'none' } : { background: '#f9fafb', border: '1px solid #e5e7eb' }}
               >
-                <ArrowRight size={14} className={mode === key ? 'text-white' : 'text-gray-400'} />
+                <ArrowRight size={13} className={mode === key ? 'text-white' : 'text-gray-400'} />
               </div>
             </button>
           ))}

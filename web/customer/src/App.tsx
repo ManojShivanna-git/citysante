@@ -5,6 +5,7 @@ import { authApi } from './services/api'
 import { connectSocket } from './services/socketService'
 
 import Navbar           from './components/Navbar'
+import BottomNav        from './components/BottomNav'
 import LoginPage        from './pages/auth/LoginPage'
 import RegisterPage     from './pages/auth/RegisterPage'
 import HomePage         from './pages/home/HomePage'
@@ -22,7 +23,8 @@ function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f9fafb]">
       <Navbar />
-      <main className="w-full">{children}</main>
+      <main className="w-full pb-14 sm:pb-0">{children}</main>
+      <BottomNav />
     </div>
   )
 }
