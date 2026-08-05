@@ -2,7 +2,7 @@ import https from 'https'
 
 const FAST2SMS_KEY         = process.env.FAST2SMS_API_KEY || ''
 const DLT_SENDER_ID        = 'ISANTH'
-const DLT_TEMPLATE_ID      = '222200'              // Fast2SMS Content Template Message ID
+const DLT_TEMPLATE_ID      = '1177178566687545340' // VILPOWER DLT Template ID
 const DLT_ENTITY_ID        = '1101098790000097305' // VILPOWER Entity ID
 const OTP_MESSAGE_TEMPLATE = 'Your Isanthe OTP is {otp}. Valid for 5 minutes. Do not share with anyone.'
 
