@@ -8,11 +8,11 @@ import Pagination from '../../components/Pagination'
 
 const LIMIT = 20
 
-export default function UsersPage() {
+export default function UsersPage({ defaultRole = '' }: { defaultRole?: string }) {
   const [users, setUsers]   = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [role, setRole]     = useState('')
+  const [role, setRole]     = useState(defaultRole)
   const [page, setPage]     = useState(1)
   const [total, setTotal]   = useState(0)
 
@@ -53,7 +53,7 @@ export default function UsersPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Users</h1>
+        <h1 className="text-2xl font-bold">{defaultRole === 'customer' ? 'Customers' : 'Users'}</h1>
         <span className="badge badge-blue">{total} total</span>
       </div>
 
