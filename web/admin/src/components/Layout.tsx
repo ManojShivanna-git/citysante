@@ -2,20 +2,19 @@ import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Store, Package, MapPin, CreditCard,
-  Users, UserCheck, LogOut, Menu, X, ChevronRight, Bell, ShoppingBag
+  Users, LogOut, Menu, X, ChevronRight, Bell, ShoppingBag
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import clsx from 'clsx'
 
 const navItems = [
-  { to: '/dashboard',          icon: LayoutDashboard, label: 'Dashboard'        },
-  { to: '/shops',              icon: Store,           label: 'Shops'             },
-  { to: '/products',           icon: Package,         label: 'Products'          },
-  { to: '/zones',              icon: MapPin,          label: 'Zones'             },
-  { to: '/billing',            icon: CreditCard,      label: 'Billing'           },
-  { to: '/customers',          icon: UserCheck,       label: 'Customers'         },
-  { to: '/users',              icon: Users,           label: 'All Users'         },
-  { to: '/product-requests',   icon: ShoppingBag,     label: 'Product Requests'  },
+  { to: '/dashboard',        icon: LayoutDashboard, label: 'Dashboard'        },
+  { to: '/shops',            icon: Store,           label: 'Shops'             },
+  { to: '/products',         icon: Package,         label: 'Products'          },
+  { to: '/zones',            icon: MapPin,          label: 'Zones'             },
+  { to: '/billing',          icon: CreditCard,      label: 'Billing'           },
+  { to: '/users',            icon: Users,           label: 'Users'             },
+  { to: '/product-requests', icon: ShoppingBag,     label: 'Product Requests'  },
 ]
 
 export default function Layout() {

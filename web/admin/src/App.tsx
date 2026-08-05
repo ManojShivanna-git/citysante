@@ -50,7 +50,6 @@ export default function App() {
         <Route path="/products"         element={<ProductsPage />} />
         <Route path="/zones"            element={<ZonesPage />} />
         <Route path="/billing"          element={<BillingPage />} />
-        <Route path="/customers"        element={<UsersPage defaultRole="customer" />} />
         <Route path="/users"            element={<UsersPage />} />
         <Route path="/product-requests" element={<ProductRequestsPage />} />
       </Route>
