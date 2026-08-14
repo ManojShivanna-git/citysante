@@ -6,9 +6,6 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import * as SecureStore from 'expo-secure-store'
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha'
-import { signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth'
-import { auth, firebaseConfig } from '../services/firebase'
 import { authApi } from '../api/api'
 import { useAuthStore } from '../store/authStore'
 import { RED } from '../theme'
@@ -18,17 +15,15 @@ type Step = 'phone' | 'otp'
 export default function LoginScreen() {
   const { setAuth } = useAuthStore()
 
-  const [step, setStep]       = useState<Step>('phone')
-  const [phone, setPhone]     = useState('')
-  const [otp, setOtp]         = useState('')
-  const [name, setName]       = useState('')
+  const [step, setStep]           = useState<Step>('phone')
+  const [phone, setPhone]         = useState('')
+  const [otp, setOtp]             = useState('')
+  const [name, setName]           = useState('')
   const [isNewUser, setIsNewUser] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [timer, setTimer]     = useState(0)
+  const [loading, setLoading]     = useState(false)
+  const [timer, setTimer]         = useState(0)
 
-  const recaptchaRef  = useRef<FirebaseRecaptchaVerifierModal>(null)
-  const confirmRef    = useRef<ConfirmationResult | null>(null)
-  const timerRef      = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const startTimer = () => {
     setTimer(30)
@@ -49,15 +44,11 @@ export default function LoginScreen() {
     }
     setLoading(true)
     try {
-      const result = await signInWithPhoneNumber(auth, '+91' + cleaned, recaptchaRef.current!)
-      confirmRef.current = result
+      await authApi.sendOTP(cleaned)
       setStep('otp')
       startTimer()
     } catch (err: any) {
-      const msg = err?.message?.includes('too-many-requests')
-        ? 'Too many attempts. Try again later.'
-        : 'Failed to send OTP. Try again.'
-      Alert.alert('Error', msg)
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to send OTP. Try again.')
     } finally {
       setLoading(false)
     }
@@ -65,15 +56,10 @@ export default function LoginScreen() {
 
   const handleVerifyOTP = async () => {
     if (otp.length !== 6) { Alert.alert('Invalid OTP', 'Enter the 6-digit code'); return }
-    if (!confirmRef.current) { Alert.alert('Expired', 'Resend OTP and try again'); return }
     setLoading(true)
     try {
-      const credential = await confirmRef.current.confirm(otp)
-      const idToken = await credential.user.getIdToken()
-      const res = await authApi.firebasePhone(
-        idToken,
-        isNewUser && name.trim() ? name.trim() : undefined
-      )
+      const cleaned = phone.replace(/\D/g, '')
+      const res = await authApi.verifyOTP(cleaned, otp, isNewUser && name.trim() ? name.trim() : undefined)
       const { user, accessToken, refreshToken, isNewUser: newUser } = res.data.data
       if (user.role !== 'customer') {
         Alert.alert('Wrong app', 'This app is for customers only.')
@@ -89,8 +75,7 @@ export default function LoginScreen() {
       if (refreshToken) await SecureStore.setItemAsync('customer_refresh_token', refreshToken)
       await setAuth(user, accessToken)
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Verification failed'
-      Alert.alert('Error', msg)
+      Alert.alert('Error', err?.response?.data?.message || err?.message || 'Verification failed')
     } finally {
       setLoading(false)
     }
@@ -101,8 +86,7 @@ export default function LoginScreen() {
     setLoading(true)
     try {
       const cleaned = phone.replace(/\D/g, '')
-      const result = await signInWithPhoneNumber(auth, '+91' + cleaned, recaptchaRef.current!)
-      confirmRef.current = result
+      await authApi.resendOTP(cleaned)
       setOtp('')
       startTimer()
     } catch {
@@ -114,13 +98,6 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* FirebaseRecaptchaVerifierModal — invisible by default, pops up only if reCAPTCHA challenge needed */}
-      <FirebaseRecaptchaVerifierModal
-        ref={recaptchaRef}
-        firebaseConfig={firebaseConfig}
-        attemptInvisibleVerification={true}
-      />
-
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
         {/* Header */}
