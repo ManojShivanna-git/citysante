@@ -22,32 +22,69 @@ jobs:
             cd /var/www/isanthe
 
             echo "📥 Pulling latest code..."
+            git fetch origin main
+            CHANGED=$(git diff --name-only HEAD origin/main)
             git pull origin main
 
-            echo "🔧 Building backend..."
-            cd backend
-            npm ci
-            npm run build
-            npm prune --omit=dev
-            pm2 restart isanthe-api
-            cd ..
+            echo "Changed files:"
+            echo "$CHANGED"
 
-            echo "🌐 Building customer web..."
-            cd web/customer
-            npm ci
-            npm run build
-            cd ../..
+            # ── Backend ──────────────────────────────────────────────────
+            if echo "$CHANGED" | grep -q "^backend/"; then
+              echo "🔧 Building backend..."
+              cd backend
+              if echo "$CHANGED" | grep -q "^backend/package"; then
+                npm ci
+              fi
+              npm run build
+              npm prune --omit=dev
+              pm2 restart isanthe-api
+              cd ..
+              echo "✅ Backend deployed"
+            else
+              echo "⏭️  Backend unchanged — skipping"
+            fi
 
-            echo "🏪 Building shop-owner web..."
-            cd web/shop-owner
-            npm ci
-            npm run build
-            cd ../..
+            # ── Customer Web ──────────────────────────────────────────────
+            if echo "$CHANGED" | grep -q "^web/customer/"; then
+              echo "🌐 Building customer web..."
+              cd web/customer
+              if echo "$CHANGED" | grep -q "^web/customer/package"; then
+                npm ci
+              fi
+              npm run build
+              cd ../..
+              echo "✅ Customer web deployed"
+            else
+              echo "⏭️  Customer web unchanged — skipping"
+            fi
 
-            echo "⚙️ Building admin panel..."
-            cd web/admin
-            npm ci
-            npm run build
-            cd ../..
+            # ── Shop Owner Web ────────────────────────────────────────────
+            if echo "$CHANGED" | grep -q "^web/shop-owner/"; then
+              echo "🏪 Building shop-owner web..."
+              cd web/shop-owner
+              if echo "$CHANGED" | grep -q "^web/shop-owner/package"; then
+                npm ci
+              fi
+              npm run build
+              cd ../..
+              echo "✅ Shop-owner web deployed"
+            else
+              echo "⏭️  Shop-owner web unchanged — skipping"
+            fi
 
-            echo "✅ Deploy complete!"
+            # ── Admin Panel ───────────────────────────────────────────────
+            if echo "$CHANGED" | grep -q "^web/admin/"; then
+              echo "⚙️ Building admin panel..."
+              cd web/admin
+              if echo "$CHANGED" | grep -q "^web/admin/package"; then
+                npm ci
+              fi
+              npm run build
+              cd ../..
+              echo "✅ Admin panel deployed"
+            else
+              echo "⏭️  Admin panel unchanged — skipping"
+            fi
+
+            echo "🎉 Deploy complete!"
