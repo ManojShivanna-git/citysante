@@ -26,8 +26,9 @@ jobs:
 
             echo "🔧 Building backend..."
             cd backend
-            npm ci --omit=dev
+            npm ci
             npm run build
+            npm prune --omit=dev
             pm2 restart isanthe-api
             cd ..
 
