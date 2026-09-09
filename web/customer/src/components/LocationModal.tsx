@@ -38,9 +38,10 @@ export default function LocationModal({ onClose }: Props) {
   const [confirming, setConfirming]   = useState(false)
   const [mapsReady, setMapsReady]     = useState(!!window.google?.maps?.places)
 
-  const inputRef  = useRef<HTMLInputElement>(null)
-  const mapRef    = useRef<HTMLDivElement>(null)
-  const mapObj    = useRef<any>(null)
+  const inputRef     = useRef<HTMLInputElement>(null)
+  const mapInputRef  = useRef<HTMLInputElement>(null)
+  const mapRef       = useRef<HTMLDivElement>(null)
+  const mapObj       = useRef<any>(null)
   const geocodeTimer = useRef<any>(null)
 
   // ── Load Google Maps ─────────────────────────────────────────────────────
@@ -75,6 +76,29 @@ export default function LocationModal({ onClose }: Props) {
       }
     })
   }, [mapsReady])
+
+  // ── Map search bar autocomplete ──────────────────────────────────────────
+  useEffect(() => {
+    if (step !== 'map' || !mapsReady || !mapInputRef.current) return
+    const ac = new window.google.maps.places.Autocomplete(mapInputRef.current, {
+      componentRestrictions: { country: 'in' },
+      fields: ['geometry', 'formatted_address'],
+    })
+    ac.addListener('place_changed', () => {
+      const place = ac.getPlace()
+      if (place.geometry?.location && mapObj.current) {
+        const lat = place.geometry.location.lat()
+        const lng = place.geometry.location.lng()
+        mapObj.current.panTo({ lat, lng })
+        mapObj.current.setZoom(17)
+        setCenterLat(lat)
+        setCenterLng(lng)
+        setAddress(place.formatted_address || '')
+        if (mapInputRef.current) mapInputRef.current.value = ''
+        if (mapInputRef.current) mapInputRef.current.blur()
+      }
+    })
+  }, [step, mapsReady])
 
   // ── Build map when step=map ───────────────────────────────────────────────
   useEffect(() => {
@@ -213,14 +237,26 @@ export default function LocationModal({ onClose }: Props) {
         {step === 'map' && (
           <>
             {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 shrink-0 bg-white z-10">
-              <button onClick={() => setStep('search')} className="p-2 rounded-xl hover:bg-gray-100 text-gray-600">
-                <ChevronLeft size={22} />
-              </button>
-              <p className="text-base font-bold text-gray-900 flex-1">Set Delivery Location</p>
-              <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400">
-                <X size={18} />
-              </button>
+            <div className="shrink-0 bg-white border-b border-gray-100 z-10 px-4 pt-3 pb-3">
+              <div className="flex items-center gap-2 mb-3">
+                <button onClick={() => setStep('search')} className="p-2 rounded-xl hover:bg-gray-100 text-gray-600">
+                  <ChevronLeft size={22} />
+                </button>
+                <p className="text-base font-bold text-gray-900 flex-1">Set Delivery Location</p>
+                <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400">
+                  <X size={18} />
+                </button>
+              </div>
+              {/* Search on map */}
+              <div className="flex items-center gap-2 border-2 border-gray-200 rounded-xl px-3 py-2 bg-gray-50 focus-within:border-red-400 focus-within:bg-white transition-all">
+                <Search size={15} className="text-gray-400 shrink-0" />
+                <input
+                  ref={mapInputRef}
+                  type="text"
+                  placeholder="Search landmark, area, street…"
+                  className="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none"
+                />
+              </div>
             </div>
 
             {/* Map + center pin */}
