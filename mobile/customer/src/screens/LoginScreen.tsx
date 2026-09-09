@@ -10,18 +10,23 @@ import { authApi } from '../api/api'
 import { useAuthStore } from '../store/authStore'
 import { RED } from '../theme'
 
-type Step = 'phone' | 'otp'
+type Step = 'phone' | 'otp' | 'profile'
 
 export default function LoginScreen() {
   const { setAuth } = useAuthStore()
 
-  const [step, setStep]           = useState<Step>('phone')
-  const [phone, setPhone]         = useState('')
-  const [otp, setOtp]             = useState('')
-  const [name, setName]           = useState('')
-  const [isNewUser, setIsNewUser] = useState(false)
-  const [loading, setLoading]     = useState(false)
-  const [timer, setTimer]         = useState(0)
+  const [step, setStep]     = useState<Step>('phone')
+  const [phone, setPhone]   = useState('')
+  const [otp, setOtp]       = useState('')
+  const [name, setName]     = useState('')
+  const [email, setEmail]   = useState('')
+  const [loading, setLoading] = useState(false)
+  const [timer, setTimer]   = useState(0)
+
+  // Temp storage between OTP and profile steps
+  const tempUser         = useRef<any>(null)
+  const tempAccessToken  = useRef<string>('')
+  const tempRefreshToken = useRef<string>('')
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -59,23 +64,50 @@ export default function LoginScreen() {
     setLoading(true)
     try {
       const cleaned = phone.replace(/\D/g, '')
-      const res = await authApi.verifyOTP(cleaned, otp, isNewUser && name.trim() ? name.trim() : undefined)
-      const { user, accessToken, refreshToken, isNewUser: newUser } = res.data.data
+      const res = await authApi.verifyOTP(cleaned, otp)
+      const { user, accessToken, refreshToken, isNewUser } = res.data.data
+
       if (user.role !== 'customer') {
         Alert.alert('Wrong app', 'This app is for customers only.')
         return
       }
-      // New user and no name yet — show name field
-      if (newUser && !name.trim()) {
-        setIsNewUser(true)
-        Alert.alert('One more step', 'Enter your name to complete registration.')
-        setLoading(false)
-        return
+
+      if (isNewUser) {
+        // Store tokens temporarily, show profile step
+        tempUser.current         = user
+        tempAccessToken.current  = accessToken
+        tempRefreshToken.current = refreshToken || ''
+        setStep('profile')
+      } else {
+        // Existing user — log in directly
+        if (refreshToken) await SecureStore.setItemAsync('customer_refresh_token', refreshToken)
+        await setAuth(user, accessToken)
       }
-      if (refreshToken) await SecureStore.setItemAsync('customer_refresh_token', refreshToken)
-      await setAuth(user, accessToken)
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.message || err?.message || 'Verification failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    if (!name.trim()) { Alert.alert('Name required', 'Please enter your name'); return }
+    setLoading(true)
+    try {
+      // Set token first so the profile PUT is authenticated
+      await SecureStore.setItemAsync('customer_token', tempAccessToken.current)
+      if (tempRefreshToken.current) {
+        await SecureStore.setItemAsync('customer_refresh_token', tempRefreshToken.current)
+      }
+
+      const res = await authApi.updateProfile({
+        name:  name.trim(),
+        email: email.trim() || undefined,
+      })
+      const updatedUser = res.data.data
+      await setAuth(updatedUser, tempAccessToken.current)
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Could not save profile')
     } finally {
       setLoading(false)
     }
@@ -111,7 +143,7 @@ export default function LoginScreen() {
 
         <View style={styles.card}>
 
-          {/* ── Step 1: Phone number ── */}
+          {/* ── Step 1: Phone ── */}
           {step === 'phone' && (
             <>
               <Text style={styles.title}>Enter your mobile number</Text>
@@ -156,18 +188,16 @@ export default function LoginScreen() {
           {/* ── Step 2: OTP ── */}
           {step === 'otp' && (
             <>
-              <TouchableOpacity onPress={() => { setStep('phone'); setOtp(''); setIsNewUser(false) }}
+              <TouchableOpacity onPress={() => { setStep('phone'); setOtp('') }}
                 style={styles.backBtn}>
                 <Ionicons name="arrow-back" size={20} color={RED} />
                 <Text style={styles.backText}>Change number</Text>
               </TouchableOpacity>
 
-              <View style={styles.otpHeader}>
+              <View style={styles.stepIcon}>
                 <Text style={{ fontSize: 36 }}>📱</Text>
               </View>
-              <Text style={styles.title}>
-                {isNewUser ? 'Verify & create account' : 'Enter OTP'}
-              </Text>
+              <Text style={styles.title}>Enter OTP</Text>
               <Text style={styles.subtitle}>Sent to +91 {phone}</Text>
 
               <TextInput
@@ -181,20 +211,6 @@ export default function LoginScreen() {
                 autoFocus
               />
 
-              {isNewUser && (
-                <View style={[styles.inputRow, { marginBottom: 20 }]}>
-                  <Ionicons name="person-outline" size={18} color="#9ca3af" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="Your name (e.g. Ravi Kumar)"
-                    placeholderTextColor="#9ca3af"
-                    autoCapitalize="words"
-                  />
-                </View>
-              )}
-
               <TouchableOpacity
                 style={[styles.primaryBtn, (loading || otp.length !== 6) && { opacity: 0.7 }]}
                 onPress={handleVerifyOTP}
@@ -202,9 +218,7 @@ export default function LoginScreen() {
               >
                 {loading
                   ? <ActivityIndicator color="#fff" />
-                  : <Text style={styles.primaryBtnText}>
-                      {isNewUser ? 'Create Account' : 'Verify & Login'}
-                    </Text>
+                  : <Text style={styles.primaryBtnText}>Verify & Continue</Text>
                 }
               </TouchableOpacity>
 
@@ -220,8 +234,62 @@ export default function LoginScreen() {
             </>
           )}
 
-        </View>
+          {/* ── Step 3: Profile (new users only) ── */}
+          {step === 'profile' && (
+            <>
+              <View style={styles.stepIcon}>
+                <Text style={{ fontSize: 36 }}>🎉</Text>
+              </View>
+              <Text style={styles.title}>Almost there!</Text>
+              <Text style={styles.subtitle}>Just tell us your name to complete your account</Text>
 
+              {/* Name */}
+              <Text style={styles.fieldLabel}>Your name <Text style={{ color: RED }}>*</Text></Text>
+              <View style={[styles.inputRow, { marginBottom: 16 }]}>
+                <Ionicons name="person-outline" size={18} color="#9ca3af" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="e.g. Ravi Kumar"
+                  placeholderTextColor="#9ca3af"
+                  autoCapitalize="words"
+                  autoFocus
+                />
+              </View>
+
+              {/* Email */}
+              <Text style={styles.fieldLabel}>
+                Email address{' '}
+                <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text>
+              </Text>
+              <View style={[styles.inputRow, { marginBottom: 24 }]}>
+                <Ionicons name="mail-outline" size={18} color="#9ca3af" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, (loading || !name.trim()) && { opacity: 0.7 }]}
+                onPress={handleSaveProfile}
+                disabled={loading || !name.trim()}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.primaryBtnText}>Start Shopping 🛒</Text>
+                }
+              </TouchableOpacity>
+            </>
+          )}
+
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   )
@@ -238,15 +306,17 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center', justifyContent: 'center', marginBottom: 14,
   },
-  appName:   { fontSize: 30, fontWeight: '800', color: '#fff', marginBottom: 4 },
-  tagline:   { fontSize: 14, color: 'rgba(255,255,255,0.75)' },
+  appName:  { fontSize: 30, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  tagline:  { fontSize: 14, color: 'rgba(255,255,255,0.75)' },
   card: {
     backgroundColor: '#fff', margin: 16, borderRadius: 20, padding: 24,
     shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 }, elevation: 4, marginTop: -28,
   },
+  stepIcon:  { alignItems: 'center', marginBottom: 12 },
   title:     { fontSize: 20, fontWeight: '800', color: '#111', marginBottom: 4 },
   subtitle:  { fontSize: 14, color: '#6b7280', marginBottom: 20 },
+  fieldLabel: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
   phoneRow:  { flexDirection: 'row', gap: 8, marginBottom: 20 },
   countryCode: {
     borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
@@ -260,7 +330,6 @@ const styles = StyleSheet.create({
   },
   inputIcon: { marginRight: 8 },
   input:     { flex: 1, fontSize: 15, color: '#111', paddingVertical: 14 },
-  otpHeader: { alignItems: 'center', marginBottom: 12 },
   backBtn:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 4 },
   backText:  { fontSize: 14, color: RED, fontWeight: '600' },
   otpInput: {

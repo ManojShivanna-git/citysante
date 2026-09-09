@@ -9,14 +9,11 @@ import { Ionicons } from '@expo/vector-icons'
 import { shopApi, productApi, getImageUrl } from '../api/api'
 import { useAuthStore } from '../store/authStore'
 import { useCartStore } from '../store/cartStore'
+import { setMapPickCallback } from '../utils/mapPickCallback'
 import type { Shop } from '../types'
 import type { RootStackParamList } from '../navigation'
 import { RED, YELLOW } from '../theme'
 type Nav = NativeStackNavigationProp<RootStackParamList>
-
-// Fallback coords if GPS denied (Koramangala, Bangalore — where seed shops are)
-const DEFAULT_LAT = 12.9312
-const DEFAULT_LNG = 77.6215
 
 type ShopMode = 'fast' | 'cost' | 'list'
 
@@ -149,17 +146,25 @@ export default function HomeScreen() {
   const [locLabel, setLocLabel]   = useState<string>('')
   const [locError, setLocError]   = useState(false)
 
-  // ── Get GPS location ────────────────────────────────────────────────────────
+  // ── Open location picker ─────────────────────────────────────────────────
+  const openLocationPicker = () => {
+    setMapPickCallback((result) => {
+      setCoords({ lat: result.lat, lng: result.lng })
+      setLocLabel([result.street, result.city].filter(Boolean).join(', '))
+      setLocError(false)
+    })
+    navigation.navigate('MapPicker')
+  }
+
+  // ── Get GPS location on mount ─────────────────────────────────────────────
   useEffect(() => {
     const requestLocation = async () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const Location = require('expo-location')
         const { status } = await Location.requestForegroundPermissionsAsync()
         if (status !== 'granted') {
-          setLocLabel('Location denied — using default area')
           setLocError(true)
-          setCoords({ lat: DEFAULT_LAT, lng: DEFAULT_LNG })
+          // coords stays null — prompt shown
           return
         }
         const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
@@ -176,9 +181,8 @@ export default function HomeScreen() {
         }
         setLocError(false)
       } catch {
-        setLocLabel('Using default area')
         setLocError(true)
-        setCoords({ lat: DEFAULT_LAT, lng: DEFAULT_LNG })
+        // coords stays null — prompt shown
       }
     }
     requestLocation()
@@ -186,7 +190,8 @@ export default function HomeScreen() {
 
   // ── Fetch data ───────────────────────────────────────────────────────────────
   const fetchData = async () => {
-    const loc = coords ?? { lat: DEFAULT_LAT, lng: DEFAULT_LNG }
+    if (!coords) { setLoading(false); setRefreshing(false); return }
+    const loc = coords
     try {
       if (mode === 'list') {
         const res = await shopApi.getAll({ lat: loc.lat, lng: loc.lng, mode })
@@ -239,15 +244,16 @@ export default function HomeScreen() {
           <View style={styles.heroTop}>
             <View style={{ flex: 1 }}>
               <Text style={styles.greeting}>Hi, {user?.name?.split(' ')[0] ?? 'there'} 👋</Text>
-              <TouchableOpacity style={styles.locRow} onPress={() => {}}>
+              <TouchableOpacity style={styles.locRow} onPress={openLocationPicker}>
                 <Ionicons
-                  name={locError ? 'location-outline' : 'location'}
+                  name={coords ? 'location' : 'location-outline'}
                   size={13}
-                  color={locError ? 'rgba(255,255,255,0.45)' : YELLOW}
+                  color={coords ? YELLOW : 'rgba(255,255,255,0.55)'}
                 />
-                <Text style={styles.locText} numberOfLines={1}>
-                  {locLabel || 'Getting location…'}
+                <Text style={[styles.locText, !coords && { color: 'rgba(255,255,255,0.55)' }]} numberOfLines={1}>
+                  {locLabel || (locError ? 'Tap to set location' : 'Getting location…')}
                 </Text>
+                <Ionicons name="chevron-down" size={11} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
             </View>
             <TouchableOpacity style={styles.cartBtn} onPress={() => navigation.navigate('Cart')}>
@@ -267,7 +273,7 @@ export default function HomeScreen() {
             </View>
             <View>
               <Text style={styles.wordmark}>
-                City<Text style={{ color: YELLOW }}>Sante</Text>
+                Isan<Text style={{ color: YELLOW }}>the</Text>
               </Text>
               <Text style={styles.tagline}>Fresh · Fast · Nearby</Text>
             </View>
@@ -278,6 +284,24 @@ export default function HomeScreen() {
             CONTENT — white card emerges from hero
            ══════════════════════════════════════════════ */}
         <View style={styles.contentCard}>
+          {/* ── Location prompt (when no location set) ── */}
+          {!coords && (
+            <TouchableOpacity style={styles.locationPrompt} onPress={openLocationPicker} activeOpacity={0.85}>
+              <View style={styles.locationPromptIcon}>
+                <Ionicons name="location-outline" size={22} color={RED} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.locationPromptTitle}>Where should we deliver?</Text>
+                <Text style={styles.locationPromptSub}>
+                  {locError ? 'Location access denied — tap to set manually' : 'Set your delivery location to see nearby shops'}
+                </Text>
+              </View>
+              <View style={styles.locationPromptBtn}>
+                <Text style={styles.locationPromptBtnText}>Set</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
           {/* Search bar */}
           <TouchableOpacity
             style={styles.searchBar}
@@ -463,6 +487,26 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     shadowOffset: { width: 0, height: -6 },
   },
+
+  // Location prompt banner
+  locationPrompt: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 16, marginBottom: 16,
+    padding: 14, borderRadius: 16,
+    backgroundColor: '#fff1f2',
+    borderWidth: 1.5, borderColor: '#fecaca',
+    borderStyle: 'dashed',
+  },
+  locationPromptIcon: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center',
+  },
+  locationPromptTitle: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 2 },
+  locationPromptSub:   { fontSize: 12, color: '#6b7280', lineHeight: 16 },
+  locationPromptBtn: {
+    backgroundColor: RED, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+  },
+  locationPromptBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
   // Search bar
   searchBar: {
