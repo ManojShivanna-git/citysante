@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
+import { useLocationStore } from './store/locationStore'
 import { authApi } from './services/api'
 import { connectSocket } from './services/socketService'
 
@@ -31,8 +32,12 @@ function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const { isAuthenticated, setUser } = useAuthStore()
+  const { detect } = useLocationStore()
 
   useEffect(() => {
+    // Ask for location on first load
+    detect()
+
     if (localStorage.getItem('cs_token')) {
       authApi.me()
         .then((res) => {
