@@ -90,8 +90,16 @@ export default function LocationModal({ onClose }: Props) {
     })
     mapObj.current = map
 
-    // When map stops moving → reverse geocode center
+    // Only geocode after user actually moves the map
+    let userMoved = false
+
+    map.addListener('dragstart', () => { userMoved = true })
+    map.addListener('zoom_changed', () => { userMoved = true })
+
     map.addListener('idle', () => {
+      if (!userMoved) return
+      userMoved = false
+
       const c   = map.getCenter()
       const lat = c.lat()
       const lng = c.lng()
@@ -104,11 +112,17 @@ export default function LocationModal({ onClose }: Props) {
         const addr = await reverseGeocode(lat, lng)
         setAddress(addr)
         setGeocoding(false)
-      }, 400)
+      }, 600)
     })
 
-    // Initial address
-    if (!address) reverseGeocode(centerLat, centerLng).then(setAddress)
+    // Initial address — one call only
+    if (!address) {
+      setGeocoding(true)
+      reverseGeocode(centerLat, centerLng).then(addr => {
+        setAddress(addr)
+        setGeocoding(false)
+      })
+    }
   }, [step, mapsReady])
 
   // ── GPS detect → go to map ────────────────────────────────────────────────
