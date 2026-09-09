@@ -1,18 +1,20 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ShoppingCart, MapPin, User, Search, Package, ChevronDown, Tag } from 'lucide-react'
 import { useCartStore } from '../store/cartStore'
 import { useAuthStore } from '../store/authStore'
 import { useLocationStore } from '../store/locationStore'
 import NotificationBell from './NotificationBell'
+import LocationModal from './LocationModal'
 
 export default function Navbar() {
   const { itemCount } = useCartStore()
   const { isAuthenticated } = useAuthStore()
-  const { address, detect } = useLocationStore()
+  const { address } = useLocationStore()
   const location = useLocation()
   const count    = itemCount()
   const isHome   = location.pathname === '/'
+  const [showLocationModal, setShowLocationModal] = useState(false)
 
   const badgeRef  = useRef<HTMLSpanElement>(null)
   const prevCount = useRef(count)
@@ -28,6 +30,7 @@ export default function Navbar() {
   }, [count])
 
   return (
+    <>
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="h-16 flex items-center gap-4">
@@ -44,11 +47,13 @@ export default function Navbar() {
 
           {/* ── Location ── */}
           <button
-            onClick={detect}
-            className="hidden md:flex items-center gap-1.5 text-sm text-gray-700 hover:text-red-600 transition-colors shrink-0 max-w-[200px]"
+            onClick={() => setShowLocationModal(true)}
+            className="hidden md:flex items-center gap-1.5 text-sm hover:text-red-600 transition-colors shrink-0 max-w-[220px]"
           >
-            <MapPin size={14} className="text-brand-500 shrink-0" />
-            <span className="font-semibold truncate">{address}</span>
+            <MapPin size={14} className={address ? 'text-brand-500' : 'text-red-400'} style={{ flexShrink: 0 }} />
+            <span className={`font-semibold truncate ${address ? 'text-gray-700' : 'text-red-400'}`}>
+              {address || 'Set delivery location'}
+            </span>
             <ChevronDown size={13} className="text-gray-400 shrink-0" />
           </button>
 
@@ -78,7 +83,7 @@ export default function Navbar() {
             </Link>
 
             {/* Mobile location */}
-            <button onClick={detect} className="p-2.5 rounded-xl text-gray-500 hover:text-red-600 hover:bg-gray-50 transition-colors md:hidden">
+            <button onClick={() => setShowLocationModal(true)} className="p-2.5 rounded-xl text-gray-500 hover:text-red-600 hover:bg-gray-50 transition-colors md:hidden">
               <MapPin size={20} />
             </button>
 
@@ -121,5 +126,10 @@ export default function Navbar() {
         </div>
       </div>
     </header>
+
+    {showLocationModal && (
+      <LocationModal onClose={() => setShowLocationModal(false)} />
+    )}
+  </>
   )
 }

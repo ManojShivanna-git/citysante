@@ -10,6 +10,7 @@ import { useLocationStore } from '../../store/locationStore'
 import { useCartStore } from '../../store/cartStore'
 import RippleButton from '../../components/RippleButton'
 import { useQtyBump } from '../../hooks/useQtyBump'
+import LocationModal from '../../components/LocationModal'
 import type { Shop, Category } from '../../types'
 import clsx from 'clsx'
 
@@ -321,20 +322,23 @@ function Skeleton() {
 // ─── Home Page ────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const { lat, lng, address, detect } = useLocationStore()
+  const { lat, lng, address } = useLocationStore()
   const [shops, setShops]           = useState<Shop[]>([])
   const [products, setProducts]     = useState<BrowseProduct[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading]       = useState(true)
   const [mode, setMode]             = useState<'fast' | 'cost' | 'list'>('fast')
+  const [showLocationModal, setShowLocationModal] = useState(false)
+
+  const hasLocation = lat !== 0 && lng !== 0
 
   useEffect(() => {
     productApi.getCategories().then((res) => setCategories(res.data.data)).catch(() => {})
   }, [])
 
   useEffect(() => {
+    if (!hasLocation) { setLoading(false); return }
     setLoading(true)
-    // Always fetch both shops AND products for the two separate sections
     Promise.all([
       shopApi.getNearby(lat, lng, { radius: '15', limit: '20' }),
       productApi.browse(lat, lng, mode === 'list' ? 'fast' : mode, { radius: '15', limit: '20' }),
@@ -350,6 +354,7 @@ export default function HomePage() {
   const productHeading = mode === 'cost' ? '💰 Lowest Prices' : mode === 'list' ? '🏪 All Shop Products' : '🔥 Popular Products'
 
   return (
+    <>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-6 sm:space-y-8">
 
       {/* ── Hero ── */}
@@ -396,6 +401,25 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* ── Location prompt (when no location set) ── */}
+      {!hasLocation && (
+        <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-dashed border-red-200 rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+            <MapPin size={28} className="text-red-500" />
+          </div>
+          <div className="flex-1">
+            <p className="text-lg font-bold text-gray-900 mb-1">Where should we deliver?</p>
+            <p className="text-sm text-gray-500">Set your delivery location to see nearby shops and products.</p>
+          </div>
+          <button
+            onClick={() => setShowLocationModal(true)}
+            className="shrink-0 bg-red-500 hover:bg-red-600 text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm whitespace-nowrap"
+          >
+            Set Location
+          </button>
+        </div>
+      )}
 
       {/* ── Shopping modes ── */}
       <div>
@@ -546,6 +570,11 @@ export default function HomePage() {
       </div>
 
     </div>
+
+    {showLocationModal && (
+      <LocationModal onClose={() => setShowLocationModal(false)} />
+    )}
+    </>
   )
 }
 
