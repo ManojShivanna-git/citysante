@@ -1,21 +1,23 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
-import { ArrowLeft, ArrowRight, Phone } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Phone, User, Mail, CheckCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 
-type Step = 'phone' | 'otp'
+type Step = 'phone' | 'otp' | 'profile'
 
 export default function LoginPage() {
-  const { loginWithTokens } = useAuthStore()
+  const { loginWithTokens, setUser } = useAuthStore()
   const navigate = useNavigate()
 
-  const [step, setStep]           = useState<Step>('phone')
-  const [phone, setPhone]         = useState('')
-  const [otp, setOtp]             = useState('')
-  const [loading, setLoading]     = useState(false)
-  const [sending, setSending]     = useState(false)
+  const [step, setStep]       = useState<Step>('phone')
+  const [phone, setPhone]     = useState('')
+  const [otp, setOtp]         = useState('')
+  const [name, setName]       = useState('')
+  const [email, setEmail]     = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sending, setSending] = useState(false)
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,7 +49,31 @@ export default function LoginPage() {
       })
       const { user, accessToken, refreshToken, isNewUser } = res.data.data
       loginWithTokens(user, accessToken, refreshToken)
-      toast.success(isNewUser ? 'Welcome to Isanthe! 🎉' : 'Welcome back! 👋')
+
+      if (isNewUser) {
+        setStep('profile')
+      } else {
+        toast.success('Welcome back! 👋')
+        navigate('/')
+      }
+    } catch {
+      // error shown by interceptor
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) { toast.error('Please enter your name'); return }
+    setLoading(true)
+    try {
+      const res = await api.put('/auth/profile', {
+        name: name.trim(),
+        email: email.trim() || undefined,
+      })
+      setUser(res.data.data)
+      toast.success('Welcome to Isanthe! 🎉')
       navigate('/')
     } catch {
       // error shown by interceptor
@@ -192,6 +218,59 @@ export default function LoginPage() {
                   Resend OTP
                 </button>
               </p>
+            </>
+          )}
+
+          {/* ── Step 3: Profile (new users only) ── */}
+          {step === 'profile' && (
+            <>
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-green-100">🎉</div>
+                <h1 className="text-2xl font-extrabold text-gray-900">Almost there!</h1>
+                <p className="text-gray-500 text-sm mt-2">Just tell us your name to complete your account</p>
+              </div>
+
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Your name <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      className="input pl-10 w-full"
+                      placeholder="e.g. Ravi Kumar"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Email address <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="email"
+                      className="input pl-10 w-full"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">For order confirmations and receipts</p>
+                </div>
+
+                <button type="submit" disabled={loading || !name.trim()} className="btn-primary w-full py-3 text-base mt-2">
+                  {loading
+                    ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving…</span>
+                    : <span className="flex items-center justify-center gap-2"><CheckCircle size={18} /> Start Shopping</span>
+                  }
+                </button>
+              </form>
             </>
           )}
 
