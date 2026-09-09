@@ -6,9 +6,9 @@ import {
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
-import { productApi, getImageUrl } from '../api/api'
+import { productApi, shopApi, getImageUrl } from '../api/api'
 import { useCartStore } from '../store/cartStore'
-import type { ShopProduct } from '../types'
+import type { Shop, ShopProduct } from '../types'
 import type { RootStackParamList } from '../navigation'
 import { RED } from '../theme'
 type Nav = NativeStackNavigationProp<RootStackParamList>
@@ -22,6 +22,7 @@ export default function ShopScreen() {
   const shopCart = useCartStore((s) => s.getShopCart(shopId))
   const shopTotal = useCartStore((s) => s.shopTotal(shopId))
 
+  const [shop, setShop]           = useState<Shop | null>(null)
   const [products, setProducts]   = useState<ShopProduct[]>([])
   const [categories, setCategories] = useState<string[]>([])
   const [activeCat, setActiveCat] = useState<string>('All')
@@ -31,7 +32,11 @@ export default function ShopScreen() {
     navigation.setOptions({ title: shopName })
     const fetch = async () => {
       try {
-        const prodRes = await productApi.getShopProducts(shopId)
+        const [shopRes, prodRes] = await Promise.all([
+          shopApi.getById(shopId),
+          productApi.getShopProducts(shopId),
+        ])
+        setShop(shopRes.data.data)
         const prods: ShopProduct[] = prodRes.data.data || []
         setProducts(prods)
         const cats = ['All', ...Array.from(new Set(prods.map((p) => p.category_name).filter(Boolean)))]
@@ -64,8 +69,54 @@ export default function ShopScreen() {
 
   const filtered = activeCat === 'All' ? products : products.filter((p) => p.category_name === activeCat)
 
+  const coverUri = getImageUrl(shop?.cover_url)
+  const logoUri  = getImageUrl(shop?.logo_url)
+
   return (
     <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+
+      {/* ── Shop header ── */}
+      <View style={styles.shopHeader}>
+        {/* Cover */}
+        <View style={styles.coverBox}>
+          {coverUri
+            ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            : <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#ef4444' }]} />
+          }
+          <View style={styles.coverOverlay} />
+        </View>
+        {/* Logo */}
+        <View style={styles.logoWrapper}>
+          <View style={styles.logoBox}>
+            {logoUri
+              ? <Image source={{ uri: logoUri }} style={styles.logoImg} resizeMode="cover" />
+              : <Text style={styles.logoLetter}>{shopName.charAt(0)}</Text>
+            }
+          </View>
+        </View>
+        {/* Info */}
+        <View style={styles.shopInfo}>
+          <Text style={styles.shopInfoName}>{shopName}</Text>
+          {shop && (
+            <View style={styles.shopInfoMeta}>
+              <Ionicons name="star" size={12} color="#f59e0b" />
+              <Text style={styles.shopInfoMetaText}>
+                {shop.rating ? parseFloat(String(shop.rating)).toFixed(1) : '—'}
+              </Text>
+              <Text style={styles.shopInfoDot}>·</Text>
+              <Ionicons name="time-outline" size={12} color="#9ca3af" />
+              <Text style={styles.shopInfoMetaText}>{shop.delivery_time_min}–{shop.delivery_time_max} min</Text>
+              <Text style={styles.shopInfoDot}>·</Text>
+              <View style={[styles.openPill, { backgroundColor: shop.is_open ? '#dcfce7' : '#f3f4f6' }]}>
+                <Text style={[styles.openPillText, { color: shop.is_open ? '#16a34a' : '#9ca3af' }]}>
+                  {shop.is_open ? 'Open' : 'Closed'}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+
       {/* Category filter */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catBar} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
         {categories.map((c) => (
@@ -159,6 +210,30 @@ export default function ShopScreen() {
 }
 
 const styles = StyleSheet.create({
+  // ── Shop header ──────────────────────────────────────────────────────────
+  shopHeader: { backgroundColor: '#fff', marginBottom: 4 },
+  coverBox: { height: 110, overflow: 'hidden', position: 'relative' },
+  coverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  logoWrapper: { paddingHorizontal: 16, marginTop: -28 },
+  logoBox: {
+    width: 56, height: 56, borderRadius: 16,
+    backgroundColor: '#fff1f2', borderWidth: 3, borderColor: '#fff',
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6, elevation: 4,
+  },
+  logoImg:    { width: 56, height: 56 },
+  logoLetter: { fontSize: 22, fontWeight: '800', color: RED },
+  shopInfo:   { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 12 },
+  shopInfoName: { fontSize: 18, fontWeight: '800', color: '#111', marginBottom: 4 },
+  shopInfoMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  shopInfoMetaText: { fontSize: 12, color: '#6b7280' },
+  shopInfoDot: { color: '#d1d5db', fontSize: 12 },
+  openPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+  openPillText: { fontSize: 11, fontWeight: '700' },
+
   catBar:          { backgroundColor: '#fff', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', maxHeight: 54 },
   catChip:         { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: '#f3f4f6' },
   catChipActive:   { backgroundColor: RED },

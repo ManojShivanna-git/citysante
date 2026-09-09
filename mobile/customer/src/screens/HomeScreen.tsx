@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, Image,
+  ActivityIndicator, RefreshControl, Image, ImageBackground,
 } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -41,7 +41,10 @@ function ShopCard({ shop, onPress }: { shop: Shop; onPress: () => void }) {
     <TouchableOpacity style={styles.shopCard} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.shopCardTop}>
         <View style={styles.shopAvatar}>
-          <Text style={styles.shopAvatarText}>{shop.name.charAt(0)}</Text>
+          {getImageUrl(shop.logo_url)
+            ? <Image source={{ uri: getImageUrl(shop.logo_url) }} style={styles.shopAvatarImg} resizeMode="cover" />
+            : <Text style={styles.shopAvatarText}>{shop.name.charAt(0)}</Text>
+          }
         </View>
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={styles.shopName}>{shop.name}</Text>
@@ -551,7 +554,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 }, elevation: 2,
   },
   shopCardTop:    { flexDirection: 'row', alignItems: 'flex-start' },
-  shopAvatar:     { width: 48, height: 48, borderRadius: 14, backgroundColor: '#fff1f2', alignItems: 'center', justifyContent: 'center' },
+  shopAvatar:     { width: 48, height: 48, borderRadius: 14, backgroundColor: '#fff1f2', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  shopAvatarImg:  { width: 48, height: 48 },
   shopAvatarText: { fontSize: 20, fontWeight: '800', color: RED },
   shopName:       { fontSize: 15, fontWeight: '700', color: '#111', marginBottom: 2 },
   shopAddress:    { fontSize: 12, color: '#6b7280', marginBottom: 4 },

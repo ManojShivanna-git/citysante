@@ -34,6 +34,8 @@ export interface Shop {
   is_open: boolean
   badges: string[]
   distance_km?: number
+  logo_url?: string | null
+  cover_url?: string | null
 }
 
 export interface Category {
