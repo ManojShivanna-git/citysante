@@ -154,21 +154,25 @@ export default function MapPickerModal({ open, onClose, onConfirm }: Props) {
       mapRef.current = map
 
       let idleTimeout: ReturnType<typeof setTimeout> | null = null
+      let userMoved = false
 
       map.addListener('dragstart', () => {
         if (idleTimeout) clearTimeout(idleTimeout)
+        userMoved = true
         setDragging(true)
         setParsed(null)
       })
+      map.addListener('zoom_changed', () => { userMoved = true })
       map.addListener('idle', () => {
-        if (cancelled) return
+        if (cancelled || !userMoved) return
+        userMoved = false
         const c   = map.getCenter()
         const lat = c.lat() as number
         const lng = c.lng() as number
         setCenter({ lat, lng })
         setDragging(false)
         if (idleTimeout) clearTimeout(idleTimeout)
-        idleTimeout = setTimeout(() => doGeocode(lat, lng), 300)
+        idleTimeout = setTimeout(() => doGeocode(lat, lng), 400)
       })
 
       if (searchRef.current && google.maps.places) {
