@@ -14,11 +14,13 @@ type Step = 'phone' | 'otp'
 export default function LoginScreen() {
   const { setAuth } = useAuthStore()
 
-  const [step, setStep]   = useState<Step>('phone')
-  const [phone, setPhone] = useState('')
-  const [otp, setOtp]     = useState('')
-  const [loading, setLoading] = useState(false)
-  const [timer, setTimer] = useState(0)
+  const [step, setStep]           = useState<Step>('phone')
+  const [phone, setPhone]         = useState('')
+  const [otp, setOtp]             = useState('')
+  const [name, setName]           = useState('')
+  const [isNewUser, setIsNewUser] = useState(false)
+  const [loading, setLoading]     = useState(false)
+  const [timer, setTimer]         = useState(0)
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -38,7 +40,9 @@ export default function LoginScreen() {
     }
     setLoading(true)
     try {
-      await authApi.sendOTP(cleaned)
+      const res = await authApi.sendOTP(cleaned)
+      const newUser = res.data?.data?.isNewUser ?? false
+      setIsNewUser(newUser)
       setStep('otp')
       startTimer()
     } catch (err: any) {
@@ -48,21 +52,32 @@ export default function LoginScreen() {
 
   const handleVerifyOTP = async () => {
     if (otp.length !== 6) { Alert.alert('Invalid OTP', 'Enter the 6-digit code'); return }
+    if (isNewUser && !name.trim()) { Alert.alert('Name required', 'Please enter your name'); return }
     setLoading(true)
     try {
       const cleaned = phone.replace(/\D/g, '')
-      const res = await authApi.verifyOTP(cleaned, otp)
+      const res = await authApi.verifyOTP(cleaned, otp, 'shop_owner')
       const { user, accessToken, refreshToken } = res.data.data
-      if (user.role !== 'shop_owner') {
-        Alert.alert('Access Denied', 'This app is for shop owners only.')
-        return
-      }
+
       if (refreshToken) await SecureStore.setItemAsync('shop_refresh_token', refreshToken)
-      await setAuth(user, accessToken)
-      try {
-        const shopRes = await shopApi.getMyShop()
-        useAuthStore.getState().setShop(shopRes.data.data)
-      } catch {}
+
+      if (isNewUser) {
+        // Save token first so profile PUT is authenticated
+        await SecureStore.setItemAsync('shop_token', accessToken)
+        try {
+          const profileRes = await authApi.updateProfile({ name: name.trim() })
+          await setAuth(profileRes.data.data, accessToken)
+        } catch {
+          await setAuth(user, accessToken)
+        }
+      } else {
+        await setAuth(user, accessToken)
+        // Load shop data
+        try {
+          const shopRes = await shopApi.getMyShop()
+          useAuthStore.getState().setShop(shopRes.data.data)
+        } catch {}
+      }
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.message || err?.message || 'Verification failed')
     } finally { setLoading(false) }
@@ -94,6 +109,7 @@ export default function LoginScreen() {
 
         <View style={styles.card}>
 
+          {/* ── Step 1: Phone ── */}
           {step === 'phone' && (
             <>
               <Text style={styles.title}>Enter your mobile number</Text>
@@ -111,7 +127,6 @@ export default function LoginScreen() {
                     keyboardType="number-pad" maxLength={10} autoFocus />
                 </View>
               </View>
-              <Text style={styles.hint}>Must be registered with your shop account</Text>
 
               <TouchableOpacity style={[styles.btn, loading && { opacity: 0.7 }]}
                 onPress={handleSendOTP} disabled={loading}>
@@ -120,27 +135,54 @@ export default function LoginScreen() {
             </>
           )}
 
+          {/* ── Step 2: OTP (+ name for new users) ── */}
           {step === 'otp' && (
             <>
-              <TouchableOpacity onPress={() => { setStep('phone'); setOtp('') }} style={styles.backBtn}>
+              <TouchableOpacity onPress={() => { setStep('phone'); setOtp(''); setName('') }} style={styles.backBtn}>
                 <Ionicons name="arrow-back" size={20} color={ORANGE} />
                 <Text style={[styles.backText, { color: ORANGE }]}>Change number</Text>
               </TouchableOpacity>
 
               <View style={{ alignItems: 'center', marginBottom: 12 }}>
-                <Text style={{ fontSize: 36 }}>📱</Text>
+                <Text style={{ fontSize: 36 }}>{isNewUser ? '👋' : '📱'}</Text>
               </View>
-              <Text style={styles.title}>Enter OTP</Text>
-              <Text style={styles.subtitle}>Sent to +91 {phone}</Text>
+              <Text style={styles.title}>{isNewUser ? 'Create your account' : 'Enter OTP'}</Text>
+              <Text style={styles.subtitle}>
+                {isNewUser ? `New number: +91 ${phone}` : `Sent to +91 ${phone}`}
+              </Text>
 
+              {/* Name (new users only) */}
+              {isNewUser && (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.fieldLabel}>Your name <Text style={{ color: '#ef4444' }}>*</Text></Text>
+                  <View style={styles.inputRow}>
+                    <Ionicons name="person-outline" size={18} color="#9ca3af" style={styles.icon} />
+                    <TextInput style={styles.input} value={name}
+                      onChangeText={setName}
+                      placeholder="e.g. Suresh Kumar" placeholderTextColor="#9ca3af"
+                      autoCapitalize="words" autoFocus />
+                  </View>
+                </View>
+              )}
+
+              {/* OTP */}
+              <Text style={[styles.fieldLabel, { textAlign: 'center', marginBottom: 8 }]}>
+                {isNewUser ? 'OTP sent to your number' : '6-digit OTP'}
+              </Text>
               <TextInput style={styles.otpInput} value={otp}
                 onChangeText={(v) => setOtp(v.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000" placeholderTextColor="#9ca3af"
-                keyboardType="number-pad" maxLength={6} autoFocus />
+                keyboardType="number-pad" maxLength={6}
+                autoFocus={!isNewUser} />
 
-              <TouchableOpacity style={[styles.btn, (loading || otp.length !== 6) && { opacity: 0.7 }]}
-                onPress={handleVerifyOTP} disabled={loading || otp.length !== 6}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Verify & Sign In</Text>}
+              <TouchableOpacity
+                style={[styles.btn, (loading || otp.length !== 6 || (isNewUser && !name.trim())) && { opacity: 0.7 }]}
+                onPress={handleVerifyOTP}
+                disabled={loading || otp.length !== 6 || (isNewUser && !name.trim())}>
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.btnText}>{isNewUser ? 'Create Account' : 'Verify & Sign In'}</Text>
+                }
               </TouchableOpacity>
 
               <TouchableOpacity style={[styles.resendBtn, (timer > 0 || loading) && { opacity: 0.4 }]}
@@ -160,26 +202,27 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:  { flexGrow: 1, backgroundColor: '#fff', paddingBottom: 40 },
-  header:     { alignItems: 'center', paddingTop: 72, paddingBottom: 48, backgroundColor: ORANGE },
-  logoBox:    { width: 80, height: 80, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  appName:    { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: 4 },
-  tagline:    { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
-  card:       { backgroundColor: '#fff', margin: 16, borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4, marginTop: -28 },
-  title:      { fontSize: 20, fontWeight: '800', color: '#111', marginBottom: 4 },
-  subtitle:   { fontSize: 14, color: '#6b7280', marginBottom: 20 },
-  phoneRow:   { flexDirection: 'row', gap: 8, marginBottom: 6 },
-  countryCode:{ borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, backgroundColor: '#f9fafb', paddingHorizontal: 12, justifyContent: 'center' },
-  ccText:     { fontSize: 13, fontWeight: '600', color: '#374151' },
-  inputRow:   { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, backgroundColor: '#fafafa', paddingHorizontal: 14 },
-  icon:       { marginRight: 8 },
-  input:      { flex: 1, fontSize: 15, color: '#111', paddingVertical: 14 },
-  hint:       { fontSize: 12, color: '#9ca3af', marginBottom: 20 },
-  btn:        { backgroundColor: ORANGE, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  btnText:    { color: '#fff', fontWeight: '700', fontSize: 16 },
-  backBtn:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 4 },
-  backText:   { fontSize: 14, fontWeight: '600' },
-  otpInput:   { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, backgroundColor: '#f9fafb', textAlign: 'center', fontSize: 32, fontWeight: '800', color: '#111', letterSpacing: 12, paddingVertical: 14, marginBottom: 20 },
-  resendBtn:  { marginTop: 16, alignItems: 'center' },
-  resendText: { fontSize: 14, fontWeight: '600' },
+  container:    { flexGrow: 1, backgroundColor: '#fff', paddingBottom: 40 },
+  header:       { alignItems: 'center', paddingTop: 72, paddingBottom: 48, backgroundColor: ORANGE },
+  logoBox:      { width: 80, height: 80, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  appName:      { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  tagline:      { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
+  card:         { backgroundColor: '#fff', margin: 16, borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4, marginTop: -28 },
+  title:        { fontSize: 20, fontWeight: '800', color: '#111', marginBottom: 4 },
+  subtitle:     { fontSize: 14, color: '#6b7280', marginBottom: 20 },
+  fieldLabel:   { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  phoneRow:     { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  countryCode:  { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, backgroundColor: '#f9fafb', paddingHorizontal: 12, justifyContent: 'center' },
+  ccText:       { fontSize: 13, fontWeight: '600', color: '#374151' },
+  inputRow:     { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, backgroundColor: '#fafafa', paddingHorizontal: 14 },
+  icon:         { marginRight: 8 },
+  input:        { flex: 1, fontSize: 15, color: '#111', paddingVertical: 14 },
+  hint:         { fontSize: 12, color: '#9ca3af', marginBottom: 20 },
+  btn:          { backgroundColor: ORANGE, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  btnText:      { color: '#fff', fontWeight: '700', fontSize: 16 },
+  backBtn:      { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 4 },
+  backText:     { fontSize: 14, fontWeight: '600' },
+  otpInput:     { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, backgroundColor: '#f9fafb', textAlign: 'center', fontSize: 32, fontWeight: '800', color: '#111', letterSpacing: 12, paddingVertical: 14, marginBottom: 20 },
+  resendBtn:    { marginTop: 16, alignItems: 'center' },
+  resendText:   { fontSize: 14, fontWeight: '600' },
 })

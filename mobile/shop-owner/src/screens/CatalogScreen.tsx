@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { CameraView, useCameraPermissions } from 'expo-camera'
 import { productApi, getImageUrl } from '../api/api'
 import { useAuthStore } from '../store/authStore'
 
@@ -44,12 +45,70 @@ export default function CatalogScreen() {
   const [addedIds, setAddedIds]     = useState<Set<string>>(new Set())
   const [saving, setSaving]         = useState(false)
 
+  // Camera permission
+  const [camPermission, requestCamPermission] = useCameraPermissions()
+
   // Request new product modal
-  const [reqModal, setReqModal]     = useState(false)
-  const [reqName, setReqName]       = useState('')
-  const [reqUnit, setReqUnit]       = useState('')
-  const [reqBrand, setReqBrand]     = useState('')
-  const [reqSaving, setReqSaving]   = useState(false)
+  const [reqModal, setReqModal]         = useState(false)
+  const [reqName, setReqName]           = useState('')
+  const [reqUnit, setReqUnit]           = useState('')
+  const [reqBrand, setReqBrand]         = useState('')
+  const [reqImage, setReqImage]         = useState('')
+  const [reqSaving, setReqSaving]       = useState(false)
+
+  // Barcode scanner
+  const [scannerOpen, setScannerOpen]   = useState(false)
+  const [barcodeInput, setBarcodeInput] = useState('')
+  const [lookingUp, setLookingUp]       = useState(false)
+  const [lookupDone, setLookupDone]     = useState(false)
+
+  const resetReqModal = () => {
+    setReqModal(false)
+    setReqName(''); setReqUnit(''); setReqBrand(''); setReqImage('')
+    setBarcodeInput(''); setLookupDone(false)
+  }
+
+  const lookupBarcode = async (code: string) => {
+    if (!code.trim()) return
+    setLookingUp(true); setLookupDone(false)
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code.trim()}.json`)
+      const json = await res.json()
+      if (json.status === 1 && json.product) {
+        const p = json.product
+        const name  = p.product_name || p.product_name_en || ''
+        const brand = p.brands || ''
+        const qty   = p.quantity || ''           // e.g. "500 g" or "1 L"
+        const img   = p.image_front_url || p.image_url || ''
+        if (name) setReqName(name)
+        if (brand) setReqBrand(brand.split(',')[0].trim())
+        if (qty) setReqUnit(qty)
+        if (img) setReqImage(img)
+        setLookupDone(true)
+        if (!name) Alert.alert('Not found', 'Product found but name is missing. Fill manually.')
+      } else {
+        Alert.alert('Not found', 'No product found for this barcode. Fill manually.')
+      }
+    } catch {
+      Alert.alert('Error', 'Could not reach Open Food Facts. Check your connection.')
+    } finally {
+      setLookingUp(false)
+    }
+  }
+
+  const openScanner = async () => {
+    if (!camPermission?.granted) {
+      const result = await requestCamPermission()
+      if (!result.granted) { Alert.alert('Permission needed', 'Camera access is required to scan barcodes.'); return }
+    }
+    setScannerOpen(true)
+  }
+
+  const handleBarcodeScan = ({ data }: { data: string }) => {
+    setScannerOpen(false)
+    setBarcodeInput(data)
+    lookupBarcode(data)
+  }
 
   // Add product modal
   const [addModal, setAddModal] = useState<AddModalState>({
@@ -134,9 +193,12 @@ export default function CatalogScreen() {
     if (!reqUnit.trim()) { Alert.alert('Required', 'Enter unit (e.g. 500g, 1L, piece)'); return }
     setReqSaving(true)
     try {
-      await productApi.requestNewProduct({ name: reqName.trim(), unit: reqUnit.trim(), brand: reqBrand.trim() || undefined })
-      setReqModal(false)
-      setReqName(''); setReqUnit(''); setReqBrand('')
+      await productApi.requestNewProduct({
+        name: reqName.trim(), unit: reqUnit.trim(),
+        brand: reqBrand.trim() || undefined,
+        image_url: reqImage.trim() || undefined,
+      })
+      resetReqModal()
       Alert.alert('Requested!', 'Admin will review and add the product to the catalog.')
     } catch {
       Alert.alert('Error', 'Could not send request')
@@ -304,61 +366,122 @@ export default function CatalogScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Request New Product Modal ── */}
-      <Modal visible={reqModal} transparent animationType="slide" onRequestClose={() => setReqModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Request New Product</Text>
-            <Text style={styles.modalSubtitle}>Can't find a product? Ask admin to add it to the catalog.</Text>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Product Name *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={reqName}
-                onChangeText={setReqName}
-                placeholder="e.g. Amul Butter 100g"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Unit *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={reqUnit}
-                onChangeText={setReqUnit}
-                placeholder="e.g. 100g, 1L, piece"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Brand — optional</Text>
-              <TextInput
-                style={styles.formInput}
-                value={reqBrand}
-                onChangeText={setReqBrand}
-                placeholder="e.g. Amul"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-
-            <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setReqModal(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.saveBtn, reqSaving && { opacity: 0.7 }]}
-                onPress={handleRequestNew}
-                disabled={reqSaving}
-              >
-                {reqSaving
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.saveBtnText}>Send Request</Text>
-                }
-              </TouchableOpacity>
-            </View>
+      {/* ── Barcode Scanner Modal ── */}
+      <Modal visible={scannerOpen} animationType="slide" onRequestClose={() => setScannerOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <CameraView
+            style={{ flex: 1 }}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr'] }}
+            onBarcodeScanned={handleBarcodeScan}
+          />
+          {/* Overlay */}
+          <View style={styles.scanOverlay}>
+            <View style={styles.scanFrame} />
+            <Text style={styles.scanHint}>Point camera at product barcode</Text>
           </View>
+          <TouchableOpacity style={styles.scanClose} onPress={() => setScannerOpen(false)}>
+            <Ionicons name="close-circle" size={40} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* ── Request New Product Modal ── */}
+      <Modal visible={reqModal} transparent animationType="slide" onRequestClose={resetReqModal}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <ScrollView keyboardShouldPersistTaps="handled">
+            <View style={[styles.modalSheet, { paddingBottom: Platform.OS === 'ios' ? 40 : 24 }]}>
+              <View style={styles.modalHandle} />
+              <Text style={styles.modalTitle}>Request New Product</Text>
+              <Text style={styles.modalSubtitle}>Scan the barcode or enter it to auto-fill details.</Text>
+
+              {/* ── Barcode row ── */}
+              <View style={styles.barcodeRow}>
+                <TouchableOpacity style={styles.scanBtn} onPress={openScanner}>
+                  <Ionicons name="barcode-outline" size={20} color="#fff" />
+                  <Text style={styles.scanBtnText}>Scan</Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={[styles.formInput, { flex: 1 }]}
+                  value={barcodeInput}
+                  onChangeText={setBarcodeInput}
+                  placeholder="Enter barcode number"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="numeric"
+                />
+                <TouchableOpacity
+                  style={[styles.lookupBtn, lookingUp && { opacity: 0.6 }]}
+                  onPress={() => lookupBarcode(barcodeInput)}
+                  disabled={lookingUp}
+                >
+                  {lookingUp
+                    ? <ActivityIndicator color={ORANGE} size="small" />
+                    : <Text style={styles.lookupBtnText}>Lookup</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+
+              {/* ── Auto-filled preview ── */}
+              {lookupDone && (
+                <View style={styles.lookupResult}>
+                  {reqImage ? (
+                    <Image source={{ uri: reqImage }} style={styles.lookupImg} />
+                  ) : null}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.lookupResultTitle}>✅ Product found! Review and edit below.</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* ── Fields (editable) ── */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Product Name *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={reqName}
+                  onChangeText={setReqName}
+                  placeholder="e.g. Amul Butter 100g"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Unit / Quantity *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={reqUnit}
+                  onChangeText={setReqUnit}
+                  placeholder="e.g. 100g, 1L, piece"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Brand — optional</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={reqBrand}
+                  onChangeText={setReqBrand}
+                  placeholder="e.g. Amul"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+
+              <View style={styles.modalBtns}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={resetReqModal}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.saveBtn, reqSaving && { opacity: 0.7 }]}
+                  onPress={handleRequestNew}
+                  disabled={reqSaving}
+                >
+                  {reqSaving
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={styles.saveBtnText}>Send Request</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -403,4 +526,20 @@ const styles = StyleSheet.create({
   cancelBtnText: { fontWeight: '600', color: '#6b7280', fontSize: 14 },
   saveBtn:       { flex: 2, paddingVertical: 13, borderRadius: 12, backgroundColor: ORANGE, alignItems: 'center' },
   saveBtnText:   { fontWeight: '700', color: '#fff', fontSize: 14 },
+
+  // Barcode
+  barcodeRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  scanBtn:        { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#111', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12 },
+  scanBtnText:    { color: '#fff', fontSize: 13, fontWeight: '700' },
+  lookupBtn:      { paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: ORANGE, alignItems: 'center', justifyContent: 'center' },
+  lookupBtnText:  { color: ORANGE, fontSize: 13, fontWeight: '700' },
+  lookupResult:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0fdf4', borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#bbf7d0' },
+  lookupImg:      { width: 48, height: 48, borderRadius: 8, backgroundColor: '#e5e7eb' },
+  lookupResultTitle: { fontSize: 13, fontWeight: '700', color: '#15803d' },
+
+  // Scanner overlay
+  scanOverlay:    { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  scanFrame:      { width: 260, height: 160, borderWidth: 2.5, borderColor: ORANGE, borderRadius: 16 },
+  scanHint:       { color: '#fff', marginTop: 20, fontSize: 14, fontWeight: '600', textShadowColor: '#000', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
+  scanClose:      { position: 'absolute', top: 50, right: 20 },
 })

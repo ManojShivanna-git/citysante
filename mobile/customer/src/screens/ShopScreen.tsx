@@ -1,7 +1,7 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Image,
+  ActivityIndicator, Image, Modal, Linking, Pressable,
 } from 'react-native'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -12,6 +12,13 @@ import type { Shop, ShopProduct } from '../types'
 import type { RootStackParamList } from '../navigation'
 import { RED } from '../theme'
 type Nav = NativeStackNavigationProp<RootStackParamList>
+
+function isRealImage(url: string | null | undefined): boolean {
+  if (!url) return false
+  if (url.includes('/avatar') || url.includes('l_text') || url.includes('placeholder')) return false
+  if (url.includes('res.cloudinary.com') && !/\.(jpg|jpeg|png|webp|gif|svg)(\?|$)/i.test(url)) return false
+  return true
+}
 
 export default function ShopScreen() {
   const navigation = useNavigation<Nav>()
@@ -27,6 +34,8 @@ export default function ShopScreen() {
   const [categories, setCategories] = useState<string[]>([])
   const [activeCat, setActiveCat] = useState<string>('All')
   const [loading, setLoading]     = useState(true)
+  const [galleryImgs, setGalleryImgs] = useState<{ id: string; image_url: string }[]>([])
+  const [lightboxUri, setLightboxUri] = useState<string | null>(null)
 
   useFocusEffect(useCallback(() => {
     navigation.setOptions({ title: shopName })
@@ -46,6 +55,19 @@ export default function ShopScreen() {
     }
     fetch()
   }, [shopId]))
+
+  useEffect(() => {
+    shopApi.getShopImages(shopId)
+      .then((r: any) => setGalleryImgs(r.data.data || []))
+      .catch(() => {})
+  }, [shopId])
+
+  const openDirections = () => {
+    if (!shop) return
+    const query = encodeURIComponent(shop.address || shop.name)
+    const url = `https://www.google.com/maps/search/?api=1&query=${query}`
+    Linking.openURL(url)
+  }
 
   // Backend returns sp.id as the shop_product id
   const getSpId = (p: ShopProduct) => p.shop_product_id || (p as any).id
@@ -75,46 +97,100 @@ export default function ShopScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
 
+      {/* ── Lightbox ── */}
+      <Modal visible={!!lightboxUri} transparent animationType="fade" onRequestClose={() => setLightboxUri(null)}>
+        <Pressable style={styles.lightboxOverlay} onPress={() => setLightboxUri(null)}>
+          {lightboxUri && (
+            <Image source={{ uri: lightboxUri }} style={styles.lightboxImg} resizeMode="contain" />
+          )}
+          <TouchableOpacity style={styles.lightboxClose} onPress={() => setLightboxUri(null)}>
+            <Ionicons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+        </Pressable>
+      </Modal>
+
       {/* ── Shop header ── */}
       <View style={styles.shopHeader}>
-        {/* Cover */}
-        <View style={styles.coverBox}>
+        {/* Cover — tappable */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={styles.coverBox}
+          onPress={() => coverUri && setLightboxUri(coverUri)}
+        >
           {coverUri
             ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
             : <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#ef4444' }]} />
           }
           <View style={styles.coverOverlay} />
-        </View>
-        {/* Logo */}
+          {coverUri && (
+            <View style={styles.coverHint}>
+              <Ionicons name="expand-outline" size={12} color="#fff" />
+              <Text style={styles.coverHintText}>Tap to view</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Logo — tappable */}
         <View style={styles.logoWrapper}>
-          <View style={styles.logoBox}>
+          <TouchableOpacity
+            style={styles.logoBox}
+            onPress={() => logoUri && setLightboxUri(logoUri)}
+            activeOpacity={logoUri ? 0.8 : 1}
+          >
             {logoUri
               ? <Image source={{ uri: logoUri }} style={styles.logoImg} resizeMode="cover" />
               : <Text style={styles.logoLetter}>{shopName.charAt(0)}</Text>
             }
-          </View>
+          </TouchableOpacity>
         </View>
+
         {/* Info */}
         <View style={styles.shopInfo}>
           <Text style={styles.shopInfoName}>{shopName}</Text>
           {shop && (
-            <View style={styles.shopInfoMeta}>
-              <Ionicons name="star" size={12} color="#f59e0b" />
-              <Text style={styles.shopInfoMetaText}>
-                {shop.rating ? parseFloat(String(shop.rating)).toFixed(1) : '—'}
-              </Text>
-              <Text style={styles.shopInfoDot}>·</Text>
-              <Ionicons name="time-outline" size={12} color="#9ca3af" />
-              <Text style={styles.shopInfoMetaText}>{shop.delivery_time_min}–{shop.delivery_time_max} min</Text>
-              <Text style={styles.shopInfoDot}>·</Text>
-              <View style={[styles.openPill, { backgroundColor: shop.is_open ? '#dcfce7' : '#f3f4f6' }]}>
-                <Text style={[styles.openPillText, { color: shop.is_open ? '#16a34a' : '#9ca3af' }]}>
-                  {shop.is_open ? 'Open' : 'Closed'}
+            <>
+              <View style={styles.shopInfoMeta}>
+                <Ionicons name="star" size={12} color="#f59e0b" />
+                <Text style={styles.shopInfoMetaText}>
+                  {shop.rating ? parseFloat(String(shop.rating)).toFixed(1) : '—'}
                 </Text>
+                <Text style={styles.shopInfoDot}>·</Text>
+                <Ionicons name="time-outline" size={12} color="#9ca3af" />
+                <Text style={styles.shopInfoMetaText}>{shop.delivery_time_min}–{shop.delivery_time_max} min</Text>
+                <Text style={styles.shopInfoDot}>·</Text>
+                <View style={[styles.openPill, { backgroundColor: shop.is_open ? '#dcfce7' : '#f3f4f6' }]}>
+                  <Text style={[styles.openPillText, { color: shop.is_open ? '#16a34a' : '#9ca3af' }]}>
+                    {shop.is_open ? 'Open' : 'Closed'}
+                  </Text>
+                </View>
               </View>
-            </View>
+              {/* Directions */}
+              {shop.address && (
+                <TouchableOpacity style={styles.directionsBtn} onPress={openDirections}>
+                  <Ionicons name="navigate-outline" size={12} color={RED} />
+                  <Text style={styles.directionsBtnText} numberOfLines={1}>{shop.address}</Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </View>
+
+        {/* Gallery strip */}
+        {galleryImgs.length > 0 && (
+          <View style={styles.gallerySection}>
+            <Text style={styles.gallerySectionTitle}>Photos ({galleryImgs.length})</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+              {galleryImgs.map((img) => {
+                const uri = getImageUrl(img.image_url)
+                return (
+                  <TouchableOpacity key={img.id} onPress={() => uri && setLightboxUri(uri)} activeOpacity={0.85}>
+                    <Image source={{ uri: uri || '' }} style={styles.galleryThumb} resizeMode="cover" />
+                  </TouchableOpacity>
+                )
+              })}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Category filter */}
@@ -210,13 +286,33 @@ export default function ShopScreen() {
 }
 
 const styles = StyleSheet.create({
+  // ── Lightbox ──────────────────────────────────────────────────────────────
+  lightboxOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  lightboxImg: { width: '100%', height: '80%' },
+  lightboxClose: {
+    position: 'absolute', top: 52, right: 20,
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
   // ── Shop header ──────────────────────────────────────────────────────────
   shopHeader: { backgroundColor: '#fff', marginBottom: 4 },
-  coverBox: { height: 110, overflow: 'hidden', position: 'relative' },
+  coverBox: { height: 130, overflow: 'hidden', position: 'relative' },
   coverOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
+  coverHint: {
+    position: 'absolute', bottom: 8, right: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  coverHintText: { color: '#fff', fontSize: 10, fontWeight: '600' },
   logoWrapper: { paddingHorizontal: 16, marginTop: -28 },
   logoBox: {
     width: 56, height: 56, borderRadius: 16,
@@ -233,6 +329,17 @@ const styles = StyleSheet.create({
   shopInfoDot: { color: '#d1d5db', fontSize: 12 },
   openPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
   openPillText: { fontSize: 11, fontWeight: '700' },
+  directionsBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6,
+    borderWidth: 1, borderColor: '#fee2e2', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start',
+  },
+  directionsBtnText: { fontSize: 11, color: RED, fontWeight: '600', maxWidth: 220 },
+
+  // ── Gallery ───────────────────────────────────────────────────────────────
+  gallerySection: { borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 12, paddingBottom: 12 },
+  gallerySectionTitle: { fontSize: 13, fontWeight: '700', color: '#374151', paddingHorizontal: 16, marginBottom: 8 },
+  galleryThumb: { width: 80, height: 80, borderRadius: 12 },
 
   catBar:          { backgroundColor: '#fff', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', maxHeight: 54 },
   catChip:         { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: '#f3f4f6' },

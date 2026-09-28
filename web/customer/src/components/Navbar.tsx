@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ShoppingCart, MapPin, User, Search, Package, ChevronDown, Tag } from 'lucide-react'
+import { ShoppingCart, MapPin, User, Search, Package, ChevronDown } from 'lucide-react'
 import { useCartStore } from '../store/cartStore'
 import { useAuthStore } from '../store/authStore'
 import { useLocationStore } from '../store/locationStore'
@@ -57,8 +57,8 @@ export default function Navbar() {
             <ChevronDown size={13} className="text-gray-400 shrink-0" />
           </button>
 
-          {/* ── Search bar ── */}
-          <div className="flex-1 hidden sm:flex items-center bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+          {/* ── Search bar (hidden on /search — page has its own) ── */}
+          <div className={`flex-1 items-center bg-gray-50 border border-gray-200 rounded-xl overflow-hidden ${location.pathname === '/search' ? 'hidden' : 'hidden sm:flex'}`}>
             <Search size={15} className="text-gray-400 ml-4 shrink-0" />
             <Link
               to="/search"
@@ -78,20 +78,16 @@ export default function Navbar() {
           <div className="flex items-center gap-0.5 ml-auto sm:ml-0">
 
             {/* Mobile search */}
-            <Link to="/search" className="p-2.5 rounded-xl text-gray-500 hover:text-red-600 hover:bg-gray-50 transition-colors sm:hidden">
-              <Search size={20} />
-            </Link>
+            {location.pathname !== '/search' && (
+              <Link to="/search" className="p-2.5 rounded-xl text-gray-500 hover:text-red-600 hover:bg-gray-50 transition-colors sm:hidden">
+                <Search size={20} />
+              </Link>
+            )}
 
             {/* Mobile location */}
             <button onClick={() => setShowLocationModal(true)} className="p-2.5 rounded-xl text-gray-500 hover:text-red-600 hover:bg-gray-50 transition-colors md:hidden">
               <MapPin size={20} />
             </button>
-
-            {/* Offers */}
-            <Link to="/search" className="hidden md:flex flex-col items-center gap-0.5 px-3 py-2 text-gray-500 hover:text-red-600 transition-colors">
-              <Tag size={19} />
-              <span className="text-[10px] font-semibold">Offers</span>
-            </Link>
 
             {/* Orders */}
             <Link to={isAuthenticated ? '/orders' : '/login'} className="hidden md:flex flex-col items-center gap-0.5 px-3 py-2 text-gray-500 hover:text-red-600 transition-colors">

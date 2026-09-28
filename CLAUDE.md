@@ -384,6 +384,13 @@ VITE_GOOGLE_MAPS_API_KEY=AIzaSyDomYDJ9arv0ZY4DM-CYChxPTmV82QgBBw
 - [ ] GitHub Secrets for CI/CD (GCP_VM_IP, GCP_VM_USER, GCP_SSH_PRIVATE_KEY, EXPO_TOKEN, FIREBASE_SERVICE_ACCOUNT, VITE_GOOGLE_MAPS_API_KEY)
 - [x] Fast2SMS OTP integration — **LIVE & WORKING** (August 2026). Uses Smart OTP API (`POST /dev/otp/send`). OTP ID: `8d3c061aa8`. FAST2SMS_API_KEY set in backend .env on VM. Customer + shop-owner login both verified working. verify-otp endpoint accepts `expectedRole` param ('customer' or 'shop_owner').
 - [ ] End-to-end testing before soft launch
+- [ ] **PRODUCTION DEPLOY PENDING** (Sept 2026) — deploy these local changes to VM:
+  1. `cd /var/www/isanthe/backend && git pull && npm ci && npm run build && pm2 restart isanthe-api`
+  2. `psql -d citysante -U isanthe -f backend/src/db/migrate_user_roles.sql` (user_roles table)
+  3. `cd /var/www/isanthe/web/customer && git pull && npm run build`
+  4. `cd /var/www/isanthe/web/shop-owner && git pull && npm run build`
+  5. `cd /var/www/isanthe/web/admin && git pull && npm run build`
+  - Changes include: multi-role auth (user_roles table), Register vs Login flow (all 4 apps), Zepto-style search grid, 4 new product images, barcode scan in shop-owner mobile
 
 ---
 

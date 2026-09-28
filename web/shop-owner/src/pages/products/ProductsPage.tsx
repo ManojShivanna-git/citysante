@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Search, Plus, Edit2, Trash2, Package, X, Send, ImagePlus } from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, Package, X, Send, ImagePlus, Barcode, Loader2 } from 'lucide-react'
 import { productApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
 import type { ShopProduct, CatalogProduct, Category } from '../../types'
@@ -34,6 +34,38 @@ export default function ProductsPage() {
   const [uploadingReqImg, setUploadingReqImg] = useState(false)
   const [submittingReqs, setSubmittingReqs]   = useState(false)
   const reqImgRef = useRef<HTMLInputElement>(null)
+  const [barcode, setBarcode]         = useState('')
+  const [lookingUp, setLookingUp]     = useState(false)
+  const barcodeInputRef = useRef<HTMLInputElement>(null)
+
+  const lookupBarcode = async () => {
+    const code = barcode.trim()
+    if (!code) { toast.error('Enter a barcode number'); return }
+    setLookingUp(true)
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
+      const data = await res.json()
+      if (data.status !== 1) { toast.error('Product not found for this barcode'); return }
+      const p = data.product
+      setReqForm((f) => ({
+        ...f,
+        name:        p.product_name || p.product_name_en || f.name,
+        brand:       p.brands || f.brand,
+        description: p.generic_name || f.description,
+        image_url:   p.image_front_url || p.image_url || f.image_url,
+        unit:        p.quantity?.toLowerCase().includes('ml') ? 'ml'
+                   : p.quantity?.toLowerCase().includes('litre') ? 'litre'
+                   : p.quantity?.toLowerCase().includes('gram') || p.quantity?.toLowerCase().includes('g)') ? 'gram'
+                   : p.quantity?.toLowerCase().includes('kg') ? 'kg'
+                   : f.unit,
+      }))
+      toast.success('Product details filled from barcode!')
+    } catch {
+      toast.error('Lookup failed — check your internet connection')
+    } finally {
+      setLookingUp(false)
+    }
+  }
 
   const load = () => {
     if (!shop) return
@@ -60,6 +92,10 @@ export default function ProductsPage() {
       productApi.getCatalog({ limit: '500' })
         .then((res) => setCatalog(res.data.data))
         .catch(() => {})
+    }
+    // Auto-focus barcode input when Request tab opens (ready for scanner)
+    if (activeTab === 'request') {
+      setTimeout(() => barcodeInputRef.current?.focus(), 100)
     }
   }, [activeTab])
 
@@ -496,6 +532,32 @@ export default function ProductsPage() {
             </p>
 
             <form onSubmit={handleAddToList} className="space-y-4">
+              {/* Barcode lookup */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
+                  <Barcode size={13} /> Barcode Lookup <span className="text-gray-400 font-normal">(optional — auto-fills details)</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    ref={barcodeInputRef}
+                    className="input flex-1"
+                    placeholder="Scan or type barcode number…"
+                    value={barcode}
+                    onChange={(e) => setBarcode(e.target.value.replace(/\D/g, ''))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); lookupBarcode() } }}
+                  />
+                  <button
+                    type="button"
+                    onClick={lookupBarcode}
+                    disabled={lookingUp || !barcode.trim()}
+                    className="btn-secondary flex items-center gap-1.5 shrink-0 disabled:opacity-40"
+                  >
+                    {lookingUp ? <Loader2 size={14} className="animate-spin" /> : <Barcode size={14} />}
+                    {lookingUp ? 'Looking up…' : 'Lookup'}
+                  </button>
+                </div>
+              </div>
+
               {/* Image upload */}
               <div className="flex items-center gap-4">
                 <div className="w-20 h-20 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">

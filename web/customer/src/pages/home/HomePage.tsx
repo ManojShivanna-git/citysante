@@ -85,13 +85,29 @@ function catEmoji(name: string) {
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
 
-// Cloudinary auto-generates letter-avatar images (200 OK) when no real photo is uploaded.
-// We detect them by checking if the URL contains known avatar/placeholder patterns.
 function isRealImage(url: string | null | undefined): boolean {
   if (!url) return false
-  // Skip Cloudinary auto-generated avatars (they contain text overlays or avatar in path)
   if (url.includes('/avatar') || url.includes('l_text') || url.includes('placeholder')) return false
+  // Cloudinary auto-generated letter-avatars have no real file extension
+  if (url.includes('res.cloudinary.com') && !/\.(jpg|jpeg|png|webp|gif|svg)(\?|$)/i.test(url)) return false
   return true
+}
+
+const CAT_BG: Record<string, string> = {
+  dairy:    'from-blue-50 to-cyan-50',
+  vegetable:'from-green-50 to-emerald-50',
+  fruit:    'from-red-50 to-orange-50',
+  grocery:  'from-amber-50 to-yellow-50',
+  beverage: 'from-sky-50 to-blue-50',
+  snack:    'from-purple-50 to-pink-50',
+  bakery:   'from-orange-50 to-amber-50',
+}
+function catBg(name: string) {
+  const lower = name.toLowerCase()
+  for (const [k, v] of Object.entries(CAT_BG)) {
+    if (lower.includes(k)) return v
+  }
+  return 'from-gray-50 to-slate-50'
 }
 
 function ProductCard({ product, mode }: { product: BrowseProduct; mode: string }) {
@@ -128,88 +144,85 @@ function ProductCard({ product, mode }: { product: BrowseProduct; mode: string }
 
   const imgUrl = !imgError && isRealImage(product.image_url) ? getImgUrl(product.image_url) : null
 
+  const savings = hasDiscount ? Math.round(product.price - product.discount_price!) : 0
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 group flex flex-col shrink-0 w-44 overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 group flex flex-col shrink-0 w-40 overflow-hidden">
 
       {/* ── Image area ── */}
-      <div className="h-36 relative flex items-center justify-center bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 overflow-hidden">
+      <div className="relative bg-gray-50 overflow-hidden" style={{ height: '140px' }}>
         {imgUrl ? (
           <img
             src={imgUrl}
             alt={product.product_name}
             onError={() => setImgError(true)}
-            className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <span className="text-6xl group-hover:scale-110 transition-transform duration-200 select-none drop-shadow">
-            {catEmoji(product.category_name)}
-          </span>
-        )}
-
-        {/* Discount badge */}
-        {hasDiscount && discountPct > 0 && (
-          <span className="absolute top-2 left-2 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-            {discountPct}% OFF
-          </span>
-        )}
-
-        {/* Delivery time */}
-        <span className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-gray-600 text-[10px] font-semibold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
-          <Clock size={8} /> {product.delivery_time_min}m
-        </span>
-      </div>
-
-      {/* ── Info ── */}
-      <div className="p-3 flex flex-col flex-1">
-        <p className="text-[10px] text-grad font-bold uppercase tracking-wider truncate">
-          {product.category_name}
-        </p>
-        <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mt-0.5 flex-1">
-          {product.product_name}
-        </h3>
-        <p className="text-[11px] text-gray-400 mt-0.5 truncate">
-          {product.unit_value} {product.unit}{product.brand ? ` · ${product.brand}` : ''}
-        </p>
-
-        {/* Price + Add */}
-        <div className="flex items-center justify-between gap-1 mt-3">
-          <div>
-            <p className="font-bold text-gray-900 text-base leading-none">
-              ₹{Number(product.effective_price).toFixed(0)}
-            </p>
-            {hasDiscount && (
-              <p className="text-[11px] text-gray-400 line-through leading-tight">
-                ₹{Number(product.price).toFixed(0)}
-              </p>
-            )}
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-6xl select-none">{catEmoji(product.category_name)}</span>
           </div>
+        )}
 
+        {/* Savings badge top-left */}
+        {hasDiscount && savings > 0 && (
+          <span className="absolute top-2 left-2 bg-green-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm leading-none">
+            ₹{savings} OFF
+          </span>
+        )}
+
+        {/* ADD / stepper — overlaid bottom-right */}
+        <div className="absolute bottom-2 right-2" onClick={(e) => e.stopPropagation()}>
           {qty === 0 ? (
             <RippleButton
               onClick={handleAdd}
-              className="shrink-0 flex items-center gap-1 bg-grad
-                         text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors shadow-sm"
+              className="flex items-center gap-1 bg-white border border-orange-400 text-orange-500 text-[11px] font-bold px-3 py-1 rounded-lg shadow-sm hover:bg-orange-50 transition-colors"
             >
-              <Plus size={12} /> Add
+              <Plus size={11} strokeWidth={3} /> ADD
             </RippleButton>
           ) : (
-            <div className="flex items-center gap-1.5 bg-grad rounded-xl px-2 py-1.5 shrink-0">
-              <RippleButton onClick={handleDec} className="text-white flex items-center justify-center">
-                <Minus size={12} />
+            <div className="flex items-center bg-orange-500 rounded-lg overflow-hidden shadow-sm">
+              <RippleButton onClick={handleDec} className="text-white px-2 py-1 flex items-center">
+                <Minus size={11} strokeWidth={3} />
               </RippleButton>
-              <span ref={qtyRef} className="w-4 text-center text-xs font-bold text-white">{qty}</span>
-              <RippleButton onClick={handleInc} className="text-white flex items-center justify-center">
-                <Plus size={12} />
+              <span ref={qtyRef} className="text-white text-[11px] font-bold w-5 text-center">{qty}</span>
+              <RippleButton onClick={handleInc} className="text-white px-2 py-1 flex items-center">
+                <Plus size={11} strokeWidth={3} />
               </RippleButton>
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Info ── */}
+      <div className="px-2.5 pt-2 pb-2.5 flex flex-col gap-0.5">
+        {/* Price row */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="bg-green-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-md leading-none">
+            ₹{Number(product.effective_price).toFixed(0)}
+          </span>
+          {hasDiscount && (
+            <span className="text-[10px] text-gray-400 line-through leading-none">
+              ₹{Number(product.price).toFixed(0)}
+            </span>
+          )}
+        </div>
+
+        {/* Name */}
+        <h3 className="text-gray-800 text-xs font-medium leading-snug line-clamp-2 mt-0.5">
+          {product.product_name}
+        </h3>
+
+        {/* Weight */}
+        <p className="text-[10px] text-gray-400 truncate">
+          {product.unit_value} {product.unit}{product.brand ? ` · ${product.brand}` : ''}
+        </p>
 
         {/* Shop */}
         <Link
           to={`/shop/${product.shop_id}`}
           onClick={(e) => e.stopPropagation()}
-          className="mt-2 pt-2 border-t border-gray-50 text-[10px] text-gray-400 hover:text-orange-500 truncate transition-colors"
+          className="text-[9px] text-gray-400 hover:text-orange-500 truncate transition-colors mt-0.5"
         >
           🏪 {product.shop_name}
         </Link>
@@ -220,6 +233,14 @@ function ProductCard({ product, mode }: { product: BrowseProduct; mode: string }
 
 // ─── Shop Card ────────────────────────────────────────────────────────────────
 
+function getArea(shop: Shop): string {
+  if (shop.address) {
+    const parts = shop.address.split(',').map((p: string) => p.trim()).filter(Boolean)
+    if (parts.length >= 2) return parts[parts.length - 2]
+  }
+  return shop.city
+}
+
 const CATEGORY_EMOJI: Record<string, { emoji: string; bg: string }> = {
   grocery:   { emoji: '🛒', bg: 'from-orange-50 via-amber-50  to-yellow-50' },
   vegetable: { emoji: '🥦', bg: 'from-green-50  via-emerald-50 to-teal-50'  },
@@ -228,66 +249,61 @@ const CATEGORY_EMOJI: Record<string, { emoji: string; bg: string }> = {
 
 function ShopCard({ shop }: { shop: Shop }) {
   const cat = CATEGORY_EMOJI[shop.zone_category] ?? { emoji: '🏪', bg: 'from-orange-50 via-amber-50 to-yellow-50' }
-
-  const logoUrl = !isRealImage(shop.logo_url) ? null : getImgUrl(shop.logo_url)
+  const coverUrl = !isRealImage(shop.cover_url) ? null : getImgUrl(shop.cover_url)
+  const logoUrl  = !isRealImage(shop.logo_url)  ? null : getImgUrl(shop.logo_url)
 
   return (
     <Link
       to={`/shop/${shop.id}`}
-      className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group flex flex-row shrink-0 w-72 h-32"
+      className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 group shrink-0 w-56 flex flex-col"
     >
-      {/* ── Image (left) ── */}
-      <div className={`w-32 h-32 shrink-0 relative flex items-center justify-center overflow-hidden bg-gradient-to-br ${cat.bg}`}>
-        {logoUrl ? (
-          <img src={logoUrl} alt={shop.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-        ) : (
-          <span className="text-6xl group-hover:scale-110 transition-transform duration-200 drop-shadow-sm select-none">
-            {cat.emoji}
-          </span>
-        )}
+      {/* Cover image */}
+      <div className={`relative h-32 overflow-hidden bg-gradient-to-br ${cat.bg}`}>
+        {coverUrl
+          ? <img src={coverUrl} alt={shop.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          : <div className="w-full h-full flex items-center justify-center">
+              <span className="text-5xl opacity-40">{cat.emoji}</span>
+            </div>
+        }
+        {/* Closed overlay */}
         {!shop.is_open && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <span className="text-white font-bold text-[10px] tracking-widest uppercase">Closed</span>
           </div>
         )}
+        {/* Logo badge on cover */}
+        {logoUrl && (
+          <div className="absolute bottom-2 left-2 w-9 h-9 rounded-lg overflow-hidden border-2 border-white shadow-md bg-white">
+            <img src={logoUrl} alt="" className="w-full h-full object-cover" />
+          </div>
+        )}
       </div>
 
-      {/* ── Info (right) ── */}
-      <div className="flex flex-col justify-between flex-1 min-w-0 p-3">
-        {/* Top: name + open dot */}
-        <div>
-          <div className="flex items-center justify-between gap-1 mb-1">
-            <h3 className="font-bold text-gray-900 text-sm leading-tight truncate flex-1">{shop.name}</h3>
-            {shop.is_open && (
-              <span className="shrink-0 w-2 h-2 rounded-full bg-green-500 shadow-sm shadow-green-200" />
-            )}
-          </div>
-
-          {/* Badge */}
-          {Array.isArray(shop.badges) && shop.badges.filter(Boolean).length > 0 && (
-            <span className="inline-block bg-orange-50 text-orange-600 text-[9px] px-2 py-0.5 rounded-full font-semibold border border-orange-100">
-              {BADGE_ICONS[shop.badges.filter(Boolean)[0]] || '⭐'} {shop.badges.filter(Boolean)[0].replace(/_/g, ' ')}
-            </span>
-          )}
+      {/* Info */}
+      <div className="p-3 flex flex-col gap-1.5 flex-1">
+        <div className="flex items-start justify-between gap-1">
+          <h3 className="font-bold text-gray-900 text-sm leading-tight line-clamp-1 flex-1">{shop.name}</h3>
+          {shop.is_open && <span className="shrink-0 w-2 h-2 rounded-full bg-green-500 mt-1" />}
         </div>
 
-        {/* Middle: rating + time + distance */}
-        <div className="flex items-center gap-2 text-[11px]">
-          <span className="flex items-center gap-0.5 font-semibold text-amber-500">
+        <div className="flex items-center gap-1.5 text-[11px]">
+          <span className="flex items-center gap-0.5 font-bold text-amber-500">
             <Star size={10} fill="currentColor" /> {shop.rating || '—'}
           </span>
-          <span className="text-gray-300">|</span>
-          <span className="flex items-center gap-0.5 text-gray-500">
-            <Clock size={10} /> {shop.delivery_time_min}–{shop.delivery_time_max}m
+          <span className="text-gray-200">·</span>
+          <span className="text-gray-500 flex items-center gap-0.5">
+            <Clock size={10} /> {shop.delivery_time_min}–{shop.delivery_time_max} min
           </span>
-          <span className="text-gray-300">|</span>
-          <span className="flex items-center gap-0.5 text-gray-500">
-            <MapPin size={10} /> {shop.distance ? `${shop.distance.toFixed(1)}km` : '—'}
-          </span>
+          {shop.distance && <>
+            <span className="text-gray-200">·</span>
+            <span className="text-gray-500">{shop.distance.toFixed(1)} km</span>
+          </>}
         </div>
 
-        {/* Bottom: min order + delivery fee */}
-        <div className="flex items-center justify-between text-[11px] pt-2 border-t border-gray-50">
+        <div className="text-[11px] text-gray-400 flex items-center gap-0.5">
+          <MapPin size={10} /> {getArea(shop)}
+        </div>
+        <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-gray-50">
           <span className="text-gray-400">Min ₹{shop.minimum_order}</span>
           <span className="font-semibold text-orange-500">Del ₹{shop.delivery_fee}</span>
         </div>

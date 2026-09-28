@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Camera, Save, Store } from 'lucide-react'
+import { Camera, Save, Store, Plus, Trash2 } from 'lucide-react'
 import { shopApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
 import toast from 'react-hot-toast'
@@ -17,8 +17,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingLogo,  setUploadingLogo]  = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
-  const logoRef  = useRef<HTMLInputElement>(null)
-  const coverRef = useRef<HTMLInputElement>(null)
+  const [galleryImgs, setGalleryImgs] = useState<{ id: string; image_url: string }[]>([])
+  const [uploadingGallery, setUploadingGallery] = useState(false)
+  const logoRef    = useRef<HTMLInputElement>(null)
+  const coverRef   = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
 
   const handleImageUpload = async (file: File, type: 'logo' | 'cover') => {
     if (type === 'logo')  setUploadingLogo(true)
@@ -37,6 +40,12 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (shop) {
+      shopApi.getImages(shop.id).then((r) => setGalleryImgs(r.data.data || [])).catch(() => {})
+    }
+  }, [shop?.id])
+
+  useEffect(() => {
+    if (shop) {
       setForm({
         name:              shop.name || '',
         description:       shop.description || '',
@@ -50,6 +59,25 @@ export default function SettingsPage() {
       })
     }
   }, [shop])
+
+  const handleGalleryUpload = async (file: File) => {
+    if (galleryImgs.length >= 10) { toast.error('Maximum 10 photos allowed'); return }
+    setUploadingGallery(true)
+    try {
+      const res = await shopApi.addImage(file)
+      setGalleryImgs((prev) => [...prev, res.data.data])
+      toast.success('Photo added')
+    } catch { toast.error('Failed to upload photo') }
+    finally { setUploadingGallery(false) }
+  }
+
+  const handleGalleryDelete = async (imageId: string) => {
+    try {
+      await shopApi.deleteImage(imageId)
+      setGalleryImgs((prev) => prev.filter((img) => img.id !== imageId))
+      toast.success('Photo deleted')
+    } catch { toast.error('Failed to delete photo') }
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -251,6 +279,38 @@ export default function SettingsPage() {
           <p className="text-xs text-gray-400 mt-3">
             Pay your balance when it reaches ₹2,000. Contact admin for payment.
           </p>
+        </div>
+
+        {/* Shop photo gallery */}
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-gray-800">Shop Photos <span className="text-gray-400 font-normal text-sm">({galleryImgs.length}/10)</span></h2>
+            {galleryImgs.length < 10 && (
+              <button type="button" onClick={() => galleryRef.current?.click()}
+                disabled={uploadingGallery}
+                className="flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors">
+                {uploadingGallery ? 'Uploading…' : <><Plus size={14} /> Add Photo</>}
+              </button>
+            )}
+          </div>
+          <input ref={galleryRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleGalleryUpload(f); e.target.value = '' }} />
+          {galleryImgs.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No photos yet. Add up to 10 photos of your shop.</p>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {galleryImgs.map((img) => (
+                <div key={img.id} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-100">
+                  <img src={`${API}${img.image_url}`} alt="" className="w-full h-full object-cover" />
+                  <button type="button"
+                    onClick={() => handleGalleryDelete(img.id)}
+                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <Trash2 size={18} className="text-white" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <button type="submit" disabled={saving} className="btn-primary">

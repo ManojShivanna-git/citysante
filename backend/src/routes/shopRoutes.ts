@@ -2,6 +2,7 @@ import { Router } from 'express'
 import {
   getNearbyShops, getShopById, registerShop,
   updateShop, toggleShopOpen, getMyShop, getMyBilling, uploadShopImage,
+  getShopImages, addShopImage, deleteShopImage,
 } from '../controllers/shopController'
 import { authenticate, authorize } from '../middleware/auth'
 import { uploadImage } from '../middleware/upload'
@@ -16,5 +17,10 @@ router.post('/',              authenticate, authorize('shop_owner'), registerSho
 router.post('/upload-image',  authenticate, authorize('shop_owner'), uploadImage.single('image'), uploadShopImage)
 router.put ('/:id',           authenticate, authorize('shop_owner','admin','super_admin'), updateShop)
 router.patch('/toggle-open',  authenticate, authorize('shop_owner'), toggleShopOpen)
+
+// Shop images (gallery)
+router.get ('/:id/images',           getShopImages)
+router.post('/my/images',            authenticate, authorize('shop_owner'), uploadImage.single('image'), addShopImage)
+router.delete('/my/images/:imageId', authenticate, authorize('shop_owner'), deleteShopImage)
 
 export default router

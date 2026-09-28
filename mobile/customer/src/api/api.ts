@@ -84,8 +84,8 @@ api.interceptors.response.use(
 export const authApi = {
   // Phone OTP (customers)
   sendOTP:      (phone: string)                        => api.post('/auth/send-otp', { phone }),
-  verifyOTP:    (phone: string, otp: string, name?: string) =>
-    api.post('/auth/verify-otp', { phone, otp, ...(name ? { name } : {}) }),
+  verifyOTP:    (phone: string, otp: string) =>
+    api.post('/auth/verify-otp', { phone, otp, expectedRole: 'customer' }),
   resendOTP:    (phone: string)                        => api.post('/auth/resend-otp', { phone }),
   // Email OTP (all roles)
   sendEmailOTP:   (email: string)              => api.post('/auth/send-email-otp', { email }),
@@ -110,8 +110,9 @@ const DEFAULT_LAT = 12.9312
 const DEFAULT_LNG = 77.6215
 
 export const shopApi = {
-  getAll:  (params?: any) => api.get('/shops', { params: { lat: DEFAULT_LAT, lng: DEFAULT_LNG, radius: 50, ...params } }),
-  getById: (id: string)   => api.get(`/shops/${id}`),
+  getAll:        (params?: any) => api.get('/shops', { params: { lat: DEFAULT_LAT, lng: DEFAULT_LNG, radius: 50, ...params } }),
+  getById:       (id: string)   => api.get(`/shops/${id}`),
+  getShopImages: (id: string)   => api.get(`/shops/${id}/images`),
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────

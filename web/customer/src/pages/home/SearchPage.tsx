@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Search, Plus, Minus, Zap, DollarSign, List, Clock, MapPin, RotateCcw, TrendingUp, Sparkles } from 'lucide-react'
+import { Search, Plus, Minus, Zap, DollarSign, List, RotateCcw, TrendingUp, Sparkles } from 'lucide-react'
 import { productApi, orderApi, getImgUrl } from '../../services/api'
 import { useLocationStore } from '../../store/locationStore'
 import { useCartStore } from '../../store/cartStore'
@@ -10,7 +10,38 @@ import RippleButton from '../../components/RippleButton'
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
 
-// ── Shared result card (used both in discovery and live search) ─────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function isRealImage(url: string | null | undefined): boolean {
+  if (!url) return false
+  if (url.includes('/avatar') || url.includes('l_text') || url.includes('placeholder')) return false
+  if (url.includes('res.cloudinary.com') && !/\.(jpg|jpeg|png|webp|gif|svg)(\?|$)/i.test(url)) return false
+  return true
+}
+
+const CAT_EMOJI: Record<string, string> = {
+  dairy: '🥛', vegetable: '🥦', fruit: '🍎', grocery: '🛒',
+  beverage: '🥤', snack: '🍿', bakery: '🍞',
+}
+function catEmoji(name = '') {
+  const l = name.toLowerCase()
+  for (const [k, v] of Object.entries(CAT_EMOJI)) if (l.includes(k)) return v
+  return '📦'
+}
+
+const CAT_BG: Record<string, string> = {
+  dairy: 'from-blue-50 to-cyan-50', vegetable: 'from-green-50 to-emerald-50',
+  fruit: 'from-red-50 to-orange-50', grocery: 'from-amber-50 to-yellow-50',
+  beverage: 'from-sky-50 to-blue-50', snack: 'from-purple-50 to-pink-50',
+  bakery: 'from-orange-50 to-amber-50',
+}
+function catBg(name = '') {
+  const l = name.toLowerCase()
+  for (const [k, v] of Object.entries(CAT_BG)) if (l.includes(k)) return v
+  return 'from-gray-50 to-slate-50'
+}
+
+// ── Product Card (Zepto-style grid card) ─────────────────────────────────────
 
 function ProductCard({ r, getQty, onAdd, onUpdate }: {
   r: SearchResult
@@ -20,68 +51,70 @@ function ProductCard({ r, getQty, onAdd, onUpdate }: {
 }) {
   const qty     = getQty(r.id)
   const hasDisc = r.discount_price && r.discount_price < r.price
+  const savings = hasDisc ? Math.round(r.price - r.discount_price!) : 0
+  const imgUrl  = isRealImage(r.image_url) ? getImgUrl(r.image_url) : null
+  const cat     = (r as any).category_name || ''
+
   return (
-    <div className="card p-3.5 flex items-center gap-3 hover:shadow-md transition-shadow">
-      <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border border-gray-100">
-        {getImgUrl(r.image_url)
-          ? <img src={getImgUrl(r.image_url)!} alt={r.product_name} className="w-full h-full object-cover" />
-          : <span className="text-2xl">📦</span>
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+
+      {/* ── Image area ── */}
+      <div className={`relative bg-gradient-to-br ${catBg(cat)} aspect-square`}>
+        {imgUrl
+          ? <img src={imgUrl} alt={r.product_name} className="w-full h-full object-contain p-3" />
+          : <div className="w-full h-full flex items-center justify-center text-4xl">{catEmoji(cat)}</div>
         }
-      </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="font-semibold text-gray-900 text-sm truncate">{r.product_name}</div>
-        <div className="text-xs text-gray-400 mt-0.5">{r.unit_value} {r.unit}{(r as any).brand ? ` · ${(r as any).brand}` : ''}</div>
-        <Link to={`/shop/${r.shop_id}`} className="text-xs text-brand-500 hover:underline mt-0.5 flex items-center gap-1.5 truncate">
-          <span className="truncate">{r.shop_name}</span>
-          <span className="flex items-center gap-1 shrink-0 text-gray-400">
-            <Clock size={9} /> {r.delivery_time_min}–{r.delivery_time_max}m
+        {/* Savings badge top-left */}
+        {savings > 0 && (
+          <span className="absolute top-1.5 left-1.5 bg-green-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm leading-none">
+            ₹{savings} OFF
           </span>
-          {r.distance != null && (
-            <span className="flex items-center gap-1 shrink-0 text-gray-400">
-              <MapPin size={9} /> {r.distance.toFixed(1)}km
-            </span>
-          )}
-        </Link>
-      </div>
-
-      <div className="text-right shrink-0">
-        <div className="font-bold text-gray-900 text-sm">₹{r.effective_price}</div>
-        {hasDisc && (
-          <div className="flex items-center gap-1 justify-end">
-            <span className="text-xs text-gray-400 line-through">₹{r.price}</span>
-            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">
-              {Math.round((1 - r.discount_price! / r.price) * 100)}%
-            </span>
-          </div>
         )}
-        <div className="mt-1.5">
+
+        {/* ADD / stepper bottom-right */}
+        <div className="absolute bottom-2 right-2">
           {qty === 0 ? (
             <RippleButton
               onClick={() => onAdd(r)}
               disabled={!r.is_open}
-              className="btn-primary text-xs py-1 px-2.5 disabled:opacity-40"
+              className="bg-white border border-red-400 text-red-500 text-[11px] font-bold px-3 py-1 rounded-lg shadow-sm hover:bg-red-50 transition-colors disabled:opacity-40"
             >
-              <Plus size={12} /> Add
+              ADD
             </RippleButton>
           ) : (
-            <div className="flex items-center gap-1 bg-grad rounded-xl px-1 py-1">
-              <RippleButton
-                onClick={() => onUpdate(r.id, qty - 1)}
-                className="w-6 h-6 text-white rounded-lg flex items-center justify-center"
-              >
-                <Minus size={11} />
+            <div className="flex items-center bg-red-500 rounded-lg overflow-hidden shadow-sm">
+              <RippleButton onClick={() => onUpdate(r.id, qty - 1)} className="text-white px-1.5 py-1">
+                <Minus size={11} strokeWidth={3} />
               </RippleButton>
-              <span className="font-bold text-sm w-4 text-center text-white">{qty}</span>
-              <RippleButton
-                onClick={() => onUpdate(r.id, qty + 1)}
-                className="w-6 h-6 text-white rounded-lg flex items-center justify-center"
-              >
-                <Plus size={11} />
+              <span className="text-white text-[11px] font-bold w-5 text-center">{qty}</span>
+              <RippleButton onClick={() => onUpdate(r.id, qty + 1)} className="text-white px-1.5 py-1">
+                <Plus size={11} strokeWidth={3} />
               </RippleButton>
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Info below image ── */}
+      <div className="p-2 flex flex-col gap-0.5">
+        {/* Price row */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="bg-green-600 text-white text-[11px] font-bold px-1.5 py-0.5 rounded leading-none">
+            ₹{r.effective_price}
+          </span>
+          {hasDisc && (
+            <span className="text-[10px] text-gray-400 line-through">₹{r.price}</span>
+          )}
+        </div>
+        {/* Name */}
+        <p className="text-xs font-semibold text-gray-900 line-clamp-2 leading-snug mt-0.5">{r.product_name}</p>
+        {/* Unit */}
+        <p className="text-[10px] text-gray-400">{r.unit_value} {r.unit}{(r as any).brand ? ` · ${(r as any).brand}` : ''}</p>
+        {/* Shop */}
+        <Link to={`/shop/${r.shop_id}`} className="text-[10px] text-orange-500 hover:underline truncate">
+          {r.shop_name}
+        </Link>
       </div>
     </div>
   )
@@ -156,12 +189,12 @@ function DiscoveryView({
   }, [lat, lng, isAuthenticated])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
 
       {/* ── Order again ─────────────────────────────────────────────────── */}
       {isAuthenticated && (
         <section>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-2">
             <RotateCcw size={15} className="text-brand-500" />
             <h3 className="text-sm font-bold text-gray-800">Order again</h3>
           </div>
@@ -194,36 +227,40 @@ function DiscoveryView({
 
       {/* ── Trending today ───────────────────────────────────────────────── */}
       <section>
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp size={15} className="text-orange-500" />
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-lg bg-orange-100 flex items-center justify-center">
+            <TrendingUp size={13} className="text-orange-500" />
+          </div>
           <h3 className="text-sm font-bold text-gray-800">Trending today</h3>
-          <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-full">
+          <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full">
             🔥 Most ordered
           </span>
         </div>
         {loadingTrend ? (
           <div className="space-y-2">{[1,2,3].map((i) => <CardSkeleton key={i} />)}</div>
         ) : trending.length > 0 ? (
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {trending.map((r) => (
               <ProductCard key={r.id} r={r} getQty={getQty} onAdd={onAdd} onUpdate={onUpdate} />
             ))}
           </div>
         ) : (
-          <p className="text-xs text-gray-400 py-2">No trending items right now — check back later</p>
+          <p className="text-xs text-gray-400 py-1">No trending items right now</p>
         )}
       </section>
 
       {/* ── Popular near you ─────────────────────────────────────────────── */}
       <section>
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles size={15} className="text-yellow-500" />
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-lg bg-yellow-100 flex items-center justify-center">
+            <Sparkles size={13} className="text-yellow-500" />
+          </div>
           <h3 className="text-sm font-bold text-gray-800">Popular near you</h3>
         </div>
         {loadingPop ? (
           <div className="space-y-2">{[1,2,3].map((i) => <CardSkeleton key={i} />)}</div>
         ) : popular.length > 0 ? (
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {popular.map((r) => (
               <ProductCard key={r.id} r={r} getQty={getQty} onAdd={onAdd} onUpdate={onUpdate} />
             ))}
@@ -324,7 +361,7 @@ export default function SearchPage() {
   const showDiscovery    = !q.trim() && !categoryId
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-3">
 
       {/* Category breadcrumb */}
       {categoryLabel && (
@@ -362,7 +399,7 @@ export default function SearchPage() {
       </div>
 
       {/* Mode tabs */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         {[
           { key: 'fast' as const, icon: Zap,        label: 'Fast'  },
           { key: 'cost' as const, icon: DollarSign, label: 'Cheap' },
@@ -374,15 +411,16 @@ export default function SearchPage() {
             className={clsx(
               'flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all',
               mode === key
-                ? 'bg-brand-500 text-white border-brand-500 shadow-sm'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300'
+                ? 'text-white border-transparent shadow-sm'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
             )}
+            style={mode === key ? { background: 'linear-gradient(135deg, #dc2626, #f59e0b)' } : undefined}
           >
-            <Icon size={13} /> {label}
+            <Icon size={12} /> {label}
           </button>
         ))}
         {!isCategoryBrowse && hasResults && (
-          <span className="ml-auto text-xs text-gray-400 self-center">{results.length} results</span>
+          <span className="ml-auto text-xs text-gray-400">{results.length} results</span>
         )}
       </div>
 
@@ -404,7 +442,7 @@ export default function SearchPage() {
         </div>
 
       ) : hasResults ? (
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {results.map((r) => (
             <ProductCard
               key={r.id}

@@ -90,6 +90,11 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
         [name || defaultName, phone, expectedRole]
       )
       userResult = newUser
+      // Seed user_roles for new user
+      await query(
+        'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [newUser.rows[0].id, expectedRole]
+      )
     } else {
       // Existing user — mark verified
       await query('UPDATE users SET is_verified = TRUE, last_login_at = NOW() WHERE phone = $1', [phone])
@@ -98,9 +103,16 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
     const user = userResult.rows[0]
 
     if (!user.is_active) throw createError('Account is suspended. Please contact support.', 403)
-    if (user.role !== expectedRole) throw createError('Please use the correct app for your role', 403)
 
-    const tokens = generateTokens({ userId: user.id, role: user.role })
+    // Auto-grant the role if not already present
+    // (e.g. a customer signing up on the shop dashboard gets shop_owner role added)
+    await query(
+      'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [user.id, expectedRole]
+    )
+
+    // Issue token with the role context they logged in with
+    const tokens = generateTokens({ userId: user.id, role: expectedRole as UserRole })
 
     res.json({
       success: true,
@@ -138,13 +150,11 @@ export const firebasePhoneLogin = async (req: Request, res: Response, next: Next
 
     if (userResult.rows.length === 0) {
       if (expectedRole === 'rider') {
-        // Riders must be created by admin/shop owner
         throw createError('No account found with this number. Contact your shop admin.', 404)
       }
       if (expectedRole !== 'customer' && expectedRole !== 'shop_owner') {
         throw createError('No account found with this number.', 404)
       }
-      // Auto-create customer or shop_owner account
       const role = expectedRole === 'shop_owner' ? 'shop_owner' : 'customer'
       const defaultName = role === 'shop_owner' ? 'Shop Owner' : 'Isanthe User'
       isNewUser = true
@@ -155,6 +165,10 @@ export const firebasePhoneLogin = async (req: Request, res: Response, next: Next
         [name?.trim() || defaultName, phone, role]
       )
       userResult = newUser
+      await query(
+        'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [newUser.rows[0].id, role]
+      )
     } else {
       await query('UPDATE users SET is_verified = TRUE, last_login_at = NOW() WHERE phone = $1', [phone])
     }
@@ -162,18 +176,21 @@ export const firebasePhoneLogin = async (req: Request, res: Response, next: Next
     const user = userResult.rows[0]
     if (!user.is_active) throw createError('Account suspended. Contact support.', 403)
 
-    // Role check — allow any role for 'any', otherwise enforce
-    if (expectedRole !== 'any' && user.role !== expectedRole) {
-      throw createError('Please use the correct app for your role', 403)
+    // Auto-grant role if not already present
+    if (expectedRole !== 'any') {
+      await query(
+        'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [user.id, expectedRole]
+      )
     }
 
     let shopId: string | undefined
-    if (user.role === 'shop_owner') {
+    if (expectedRole === 'shop_owner') {
       const shopResult = await query('SELECT id FROM shops WHERE owner_id = $1 LIMIT 1', [user.id])
       if (shopResult.rows.length > 0) shopId = shopResult.rows[0].id
     }
 
-    const tokens = generateTokens({ userId: user.id, role: user.role, shopId })
+    const tokens = generateTokens({ userId: user.id, role: (expectedRole === 'any' ? user.role : expectedRole) as UserRole, shopId })
 
     res.json({
       success: true,
@@ -519,6 +536,10 @@ export const devPhoneLogin = async (req: Request, res: Response, next: NextFunct
         [name?.trim() || defaultName, phone, role]
       )
       userResult = newUser
+      await query(
+        'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [newUser.rows[0].id, role]
+      )
     } else {
       await query('UPDATE users SET last_login_at = NOW() WHERE phone = $1', [phone])
     }
@@ -526,17 +547,21 @@ export const devPhoneLogin = async (req: Request, res: Response, next: NextFunct
     const user = userResult.rows[0]
     if (!user.is_active) throw createError('Account suspended. Contact support.', 403)
 
-    if (expectedRole !== 'any' && user.role !== expectedRole) {
-      throw createError('Please use the correct app for your role', 403)
+    // Auto-grant role if not already present
+    if (expectedRole !== 'any') {
+      await query(
+        'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [user.id, expectedRole]
+      )
     }
 
     let shopId: string | undefined
-    if (user.role === 'shop_owner') {
+    if (expectedRole === 'shop_owner') {
       const shopResult = await query('SELECT id FROM shops WHERE owner_id = $1 LIMIT 1', [user.id])
       if (shopResult.rows.length > 0) shopId = shopResult.rows[0].id
     }
 
-    const tokens = generateTokens({ userId: user.id, role: user.role, shopId })
+    const tokens = generateTokens({ userId: user.id, role: (expectedRole === 'any' ? user.role : expectedRole) as UserRole, shopId })
 
     res.json({
       success: true,

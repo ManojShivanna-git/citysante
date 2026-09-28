@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Search, Package } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, Search, Package, Barcode, Loader2 } from 'lucide-react'
 import { productApi } from '../../services/api'
 import type { Category, Product } from '../../types'
 import toast from 'react-hot-toast'
@@ -24,7 +24,43 @@ export default function ProductsPage() {
   const [form, setForm] = useState({ category_id: '', name: '', description: '', unit: 'kg', unit_value: '1', brand: '', image_url: '' })
   const [catForm, setCatForm] = useState({ name: '', sort_order: '0', image_url: '' })
   const [uploadingProductImg, setUploadingProductImg] = useState(false)
-  const [uploadingCatImg, setUploadingCatImg] = useState(false)
+  const [uploadingCatImg, setUploadingCatImg]         = useState(false)
+  const [barcode, setBarcode]   = useState('')
+  const [lookingUp, setLookingUp] = useState(false)
+  const barcodeRef = useRef<HTMLInputElement>(null)
+
+  const lookupBarcode = async () => {
+    const code = barcode.trim()
+    if (!code) { toast.error('Enter a barcode number'); return }
+    setLookingUp(true)
+    try {
+      const res  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
+      const data = await res.json()
+      if (data.status !== 1) { toast.error('Product not found for this barcode'); return }
+      const p = data.product
+      const qty = (p.quantity || '').toLowerCase()
+      const unit =
+        qty.includes('ml')    ? 'ml'    :
+        qty.includes('litre') ? 'litre' :
+        qty.includes('gram') || qty.includes('g)') ? 'gram' :
+        qty.includes('kg')    ? 'kg'    : 'piece'
+      const unitValue = qty.match(/[\d.]+/)?.[0] || '1'
+      setForm((f) => ({
+        ...f,
+        name:        p.product_name || p.product_name_en || f.name,
+        brand:       p.brands       || f.brand,
+        description: p.generic_name || f.description,
+        image_url:   p.image_front_url || p.image_url || f.image_url,
+        unit,
+        unit_value:  unitValue,
+      }))
+      toast.success('Product details filled from barcode!')
+    } catch {
+      toast.error('Lookup failed — check your internet connection')
+    } finally {
+      setLookingUp(false)
+    }
+  }
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>, target: 'product' | 'category') => {
     const file = e.target.files?.[0]
@@ -70,8 +106,14 @@ export default function ProductsPage() {
       toast.success('Product added to catalog')
       setShowAddProduct(false)
       setForm({ category_id: '', name: '', description: '', unit: 'kg', unit_value: '1', brand: '', image_url: '' })
+      setBarcode('')
       loadAll()
     } catch {}
+  }
+
+  const openAddProduct = () => {
+    setShowAddProduct(true)
+    setTimeout(() => barcodeRef.current?.focus(), 100)
   }
 
   const handleAddCategory = async (e: React.FormEvent) => {
@@ -117,7 +159,7 @@ export default function ProductsPage() {
           <button onClick={() => setShowAddCat(true)} className="btn-secondary">
             <Plus size={16} /> Category
           </button>
-          <button onClick={() => setShowAddProduct(true)} className="btn-primary">
+          <button onClick={openAddProduct} className="btn-primary">
             <Plus size={16} /> Product
           </button>
         </div>
@@ -266,6 +308,30 @@ export default function ProductsPage() {
               <button onClick={() => setShowAddProduct(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
             <form onSubmit={handleAddProduct} className="space-y-3">
+              {/* Barcode lookup */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
+                  <Barcode size={13} /> Barcode Lookup
+                  <span className="text-gray-400 font-normal">(scan or type to auto-fill)</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    ref={barcodeRef}
+                    className="input flex-1"
+                    placeholder="Scan or type barcode…"
+                    value={barcode}
+                    onChange={(e) => setBarcode(e.target.value.replace(/\D/g, ''))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); lookupBarcode() } }}
+                  />
+                  <button type="button" onClick={lookupBarcode}
+                    disabled={lookingUp || !barcode.trim()}
+                    className="btn-secondary flex items-center gap-1.5 shrink-0 disabled:opacity-40">
+                    {lookingUp ? <Loader2 size={14} className="animate-spin" /> : <Barcode size={14} />}
+                    {lookingUp ? 'Looking up…' : 'Lookup'}
+                  </button>
+                </div>
+              </div>
+
               <div className="flex items-center gap-3">
                 {form.image_url ? (
                   <img src={form.image_url} alt="" className="w-14 h-14 rounded-lg object-cover border border-gray-200 bg-gray-50" />

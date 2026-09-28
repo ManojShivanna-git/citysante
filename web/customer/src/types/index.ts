@@ -3,11 +3,11 @@ export interface User {
 }
 
 export interface Shop {
-  id: string; name: string; description: string; logo_url: string | null
+  id: string; name: string; description: string; logo_url: string | null; cover_url?: string | null
   delivery_fee: number; minimum_order: number; delivery_time_min: number
   delivery_time_max: number; rating: number; total_reviews: number
   is_open: boolean; distance: number; badges: string[]
-  city: string; zone_category: string
+  city: string; address?: string | null; zone_category: string
 }
 
 export interface ShopProduct {

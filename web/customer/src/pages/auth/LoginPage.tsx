@@ -1,23 +1,27 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
-import { ArrowLeft, ArrowRight, Phone, User, Mail, CheckCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Phone, User, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 
-type Step = 'phone' | 'otp' | 'profile'
+type Step = 'phone' | 'otp'
 
 export default function LoginPage() {
   const { loginWithTokens, setUser } = useAuthStore()
   const navigate = useNavigate()
 
-  const [step, setStep]       = useState<Step>('phone')
-  const [phone, setPhone]     = useState('')
-  const [otp, setOtp]         = useState('')
-  const [name, setName]       = useState('')
-  const [email, setEmail]     = useState('')
-  const [loading, setLoading] = useState(false)
-  const [sending, setSending] = useState(false)
+  const [step, setStep]         = useState<Step>('phone')
+  const [phone, setPhone]       = useState('')
+  const [otp, setOtp]           = useState('')
+  const [name, setName]         = useState('')
+  const [email, setEmail]       = useState('')
+  const [isNewUser, setIsNewUser] = useState(false)
+  const [loading, setLoading]   = useState(false)
+  const [sending, setSending]   = useState(false)
+
+  // tokens held in memory until profile saved (new user)
+  const [pendingTokens, setPendingTokens] = useState<{ accessToken: string; refreshToken: string } | null>(null)
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,9 +32,11 @@ export default function LoginPage() {
     }
     setSending(true)
     try {
-      await api.post('/auth/send-otp', { phone: cleaned })
+      const res = await api.post('/auth/send-otp', { phone: cleaned })
+      const newUser = res.data?.data?.isNewUser ?? false
+      setIsNewUser(newUser)
       setStep('otp')
-      toast.success('OTP sent to your number')
+      toast.success(newUser ? 'OTP sent — create your account' : 'OTP sent to your number')
     } catch {
       // error shown by interceptor
     } finally {
@@ -41,39 +47,33 @@ export default function LoginPage() {
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     if (otp.length !== 6) { toast.error('Enter the 6-digit OTP'); return }
+    if (isNewUser && !name.trim()) { toast.error('Please enter your name'); return }
     setLoading(true)
     try {
       const res = await api.post('/auth/verify-otp', {
         phone: phone.replace(/\D/g, ''),
         otp,
+        expectedRole: 'customer',
       })
-      const { user, accessToken, refreshToken, isNewUser } = res.data.data
+      const { user, accessToken, refreshToken } = res.data.data
       loginWithTokens(user, accessToken, refreshToken)
 
       if (isNewUser) {
-        setStep('profile')
+        // Save profile right away — name was collected on the same screen
+        setPendingTokens({ accessToken, refreshToken })
+        try {
+          const profileRes = await api.put('/auth/profile', {
+            name:  name.trim(),
+            email: email.trim() || undefined,
+          })
+          setUser(profileRes.data.data)
+        } catch {
+          // profile update failed — still log in, user can update later
+        }
+        toast.success('Welcome to Isanthe! 🎉')
       } else {
         toast.success('Welcome back! 👋')
-        navigate('/')
       }
-    } catch {
-      // error shown by interceptor
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) { toast.error('Please enter your name'); return }
-    setLoading(true)
-    try {
-      const res = await api.put('/auth/profile', {
-        name: name.trim(),
-        email: email.trim() || undefined,
-      })
-      setUser(res.data.data)
-      toast.success('Welcome to Isanthe! 🎉')
       navigate('/')
     } catch {
       // error shown by interceptor
@@ -139,7 +139,7 @@ export default function LoginPage() {
           {step === 'phone' && (
             <>
               <h1 className="text-2xl font-extrabold text-gray-900">Enter your mobile number</h1>
-              <p className="text-gray-500 text-sm mt-1 mb-8">We'll verify your number to sign you in</p>
+              <p className="text-gray-500 text-sm mt-1 mb-8">We'll send you a verification code</p>
 
               <form onSubmit={handleSendOTP} className="space-y-4">
                 <div>
@@ -167,110 +167,107 @@ export default function LoginPage() {
 
               <p className="text-center text-xs text-gray-400 mt-6 leading-relaxed">
                 By continuing, you agree to our Terms of Service and Privacy Policy.
-                <br />New users are automatically registered.
               </p>
             </>
           )}
 
-          {/* ── Step 2: OTP ── */}
+          {/* ── Step 2: OTP (+ name for new users) ── */}
           {step === 'otp' && (
             <>
-              <button onClick={() => { setStep('phone'); setOtp('') }}
-                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-8 transition-colors">
+              <button onClick={() => { setStep('phone'); setOtp(''); setName(''); setEmail('') }}
+                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-6 transition-colors">
                 <ArrowLeft size={16} /> Change number
               </button>
 
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-orange-100">📱</div>
-                <h1 className="text-2xl font-extrabold text-gray-900">Enter OTP</h1>
-                <p className="text-gray-500 text-sm mt-2">
-                  For <span className="font-semibold text-gray-700">+91 {phone}</span>
-                </p>
-              </div>
+              {isNewUser ? (
+                <>
+                  <div className="text-center mb-6">
+                    <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3 border border-orange-100">👋</div>
+                    <h1 className="text-2xl font-extrabold text-gray-900">Create your account</h1>
+                    <p className="text-gray-500 text-sm mt-1">New number — let's get you set up</p>
+                    <p className="text-gray-400 text-xs mt-0.5">+91 {phone}</p>
+                  </div>
 
-              <form onSubmit={handleVerifyOTP} className="space-y-5">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">6-digit OTP</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full h-16 rounded-xl border-2 border-gray-200 text-center text-3xl font-bold outline-none tracking-widest focus:border-orange-400 bg-white transition-all"
-                    placeholder="000000"
-                    autoFocus
-                  />
-                </div>
+                  <form onSubmit={handleVerifyOTP} className="space-y-4">
+                    {/* Name */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Your name <span className="text-red-500">*</span></label>
+                      <div className="relative">
+                        <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input type="text" className="input pl-10 w-full" placeholder="e.g. Ravi Kumar"
+                          value={name} onChange={(e) => setName(e.target.value)} autoFocus required />
+                      </div>
+                    </div>
 
-                <button type="submit" disabled={loading || otp.length !== 6} className="btn-primary w-full py-3 text-base">
-                  {loading
-                    ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Verifying…</span>
-                    : <span className="flex items-center justify-center gap-2">Verify & Login <ArrowRight size={16} /></span>
-                  }
-                </button>
-              </form>
+                    {/* Email (optional) */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Email <span className="text-gray-400 font-normal">(optional)</span>
+                      </label>
+                      <div className="relative">
+                        <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input type="email" className="input pl-10 w-full" placeholder="you@example.com"
+                          value={email} onChange={(e) => setEmail(e.target.value)} />
+                      </div>
+                    </div>
 
-              <p className="text-center text-sm text-gray-500 mt-6">
+                    {/* OTP */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5 text-center">OTP sent to your number</label>
+                      <input
+                        type="text" inputMode="numeric" maxLength={6}
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        className="w-full h-14 rounded-xl border-2 border-gray-200 text-center text-2xl font-bold outline-none tracking-widest focus:border-orange-400 bg-white transition-all"
+                        placeholder="000000"
+                      />
+                    </div>
+
+                    <button type="submit" disabled={loading || otp.length !== 6 || !name.trim()} className="btn-primary w-full py-3 text-base">
+                      {loading
+                        ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating…</span>
+                        : <span className="flex items-center justify-center gap-2">Create Account <ArrowRight size={16} /></span>
+                      }
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <div className="text-center mb-6">
+                    <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3 border border-orange-100">📱</div>
+                    <h1 className="text-2xl font-extrabold text-gray-900">Enter OTP</h1>
+                    <p className="text-gray-500 text-sm mt-1">
+                      Sent to <span className="font-semibold text-gray-700">+91 {phone}</span>
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleVerifyOTP} className="space-y-5">
+                    <input
+                      type="text" inputMode="numeric" maxLength={6}
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="w-full h-16 rounded-xl border-2 border-gray-200 text-center text-3xl font-bold outline-none tracking-widest focus:border-orange-400 bg-white transition-all"
+                      placeholder="000000"
+                      autoFocus
+                    />
+
+                    <button type="submit" disabled={loading || otp.length !== 6} className="btn-primary w-full py-3 text-base">
+                      {loading
+                        ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Verifying…</span>
+                        : <span className="flex items-center justify-center gap-2">Login <ArrowRight size={16} /></span>
+                      }
+                    </button>
+                  </form>
+                </>
+              )}
+
+              <p className="text-center text-sm text-gray-500 mt-5">
                 Didn't receive it?{' '}
                 <button type="button" onClick={handleResend}
                   className="font-bold text-brand-500 hover:text-brand-600 transition-colors">
                   Resend OTP
                 </button>
               </p>
-            </>
-          )}
-
-          {/* ── Step 3: Profile (new users only) ── */}
-          {step === 'profile' && (
-            <>
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-green-100">🎉</div>
-                <h1 className="text-2xl font-extrabold text-gray-900">Almost there!</h1>
-                <p className="text-gray-500 text-sm mt-2">Just tell us your name to complete your account</p>
-              </div>
-
-              <form onSubmit={handleSaveProfile} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Your name <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      className="input pl-10 w-full"
-                      placeholder="e.g. Ravi Kumar"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      autoFocus
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Email address <span className="text-gray-400 font-normal">(optional)</span>
-                  </label>
-                  <div className="relative">
-                    <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="email"
-                      className="input pl-10 w-full"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">For order confirmations and receipts</p>
-                </div>
-
-                <button type="submit" disabled={loading || !name.trim()} className="btn-primary w-full py-3 text-base mt-2">
-                  {loading
-                    ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving…</span>
-                    : <span className="flex items-center justify-center gap-2"><CheckCircle size={18} /> Start Shopping</span>
-                  }
-                </button>
-              </form>
             </>
           )}
 

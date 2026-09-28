@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Store, MapPin, Phone, Clock, ChevronRight, Camera } from 'lucide-react'
+import { Store, MapPin, Clock, ChevronRight, Camera } from 'lucide-react'
 import { shopApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
 import { useAuthStore } from '../../store/authStore'
@@ -31,9 +31,9 @@ function loadGoogleMaps(): Promise<void> {
 }
 
 export default function RegisterShopPage() {
-  const { setShop }  = useShopStore()
-  const { logout }   = useAuthStore()
-  const navigate     = useNavigate()
+  const { setShop }      = useShopStore()
+  const { logout, user } = useAuthStore()
+  const navigate         = useNavigate()
   const mapRef       = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapObj       = useRef<any>(null)
@@ -43,11 +43,14 @@ export default function RegisterShopPage() {
   const [step, setStep]   = useState(1)
   const [saving, setSaving] = useState(false)
   const [mapsReady, setMapsReady] = useState(!!(window as any).google?.maps)
-  const [logoFile, setLogoFile]     = useState<File | null>(null)
+  const [logoFile, setLogoFile]       = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
-  const logoInputRef = useRef<HTMLInputElement>(null)
+  const logoInputRef  = useRef<HTMLInputElement>(null)
+  const [coverFile, setCoverFile]       = useState<File | null>(null)
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
-    name: '', description: '', phone: '',
+    name: '', description: '',
     address: '', city: '', state: '', pincode: '',
     lat: '', lng: '',
     zone_category: 'grocery',
@@ -122,6 +125,13 @@ export default function RegisterShopPage() {
     setLogoPreview(URL.createObjectURL(file))
   }
 
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCoverFile(file)
+    setCoverPreview(URL.createObjectURL(file))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.lat || !form.lng) {
@@ -132,6 +142,7 @@ export default function RegisterShopPage() {
     try {
       const payload = {
         ...form,
+        phone: user?.phone || '',
         lat: parseFloat(form.lat),
         lng: parseFloat(form.lng),
         delivery_fee:      parseFloat(form.delivery_fee)      || 0,
@@ -140,15 +151,26 @@ export default function RegisterShopPage() {
         delivery_time_max: parseInt(form.delivery_time_max)   || 45,
       }
       const res = await shopApi.registerShop(payload)
-      const shop = res.data.data
+      let shop = res.data.data
       setShop(shop)
       // Upload logo if one was selected
       if (logoFile) {
         try {
           const imgRes = await shopApi.uploadImage(logoFile, 'logo')
-          setShop({ ...shop, ...imgRes.data.data })
+          shop = { ...shop, ...imgRes.data.data }
+          setShop(shop)
         } catch {
-          toast.error('Shop registered but logo upload failed. You can add it in Settings.')
+          toast.error('Logo upload failed. You can add it in Settings.')
+        }
+      }
+      // Upload cover photo if one was selected
+      if (coverFile) {
+        try {
+          const imgRes = await shopApi.uploadImage(coverFile, 'cover')
+          shop = { ...shop, ...imgRes.data.data }
+          setShop(shop)
+        } catch {
+          toast.error('Cover photo upload failed. You can add it in Settings.')
         }
       }
       toast.success('Shop registered! Waiting for admin approval.')
@@ -200,6 +222,33 @@ export default function RegisterShopPage() {
                   value={form.name} onChange={(e) => set('name', e.target.value)} required />
               </div>
 
+              {/* Cover Photo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cover Photo (optional)</label>
+                <div
+                  onClick={() => coverInputRef.current?.click()}
+                  className="w-full h-32 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors overflow-hidden relative"
+                >
+                  {coverPreview
+                    ? <img src={coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
+                    : <div className="text-center">
+                        <Camera size={24} className="text-gray-400 mx-auto mb-1" />
+                        <p className="text-xs text-gray-400">Upload cover photo</p>
+                        <p className="text-xs text-gray-300">PNG, JPG or WebP · Max 5MB</p>
+                      </div>
+                  }
+                  {coverPreview && (
+                    <button type="button"
+                      onClick={(e) => { e.stopPropagation(); setCoverFile(null); setCoverPreview(null) }}
+                      className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-lg">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <input ref={coverInputRef} type="file" accept="image/png,image/jpeg,image/webp"
+                  className="hidden" onChange={handleCoverChange} />
+              </div>
+
               {/* Shop Logo */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Shop Logo (optional)</label>
@@ -235,12 +284,10 @@ export default function RegisterShopPage() {
                   value={form.description} onChange={(e) => set('description', e.target.value)} />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <Phone size={12} className="inline mr-1" /> Shop Contact Number *
-                </label>
-                <input className="input" placeholder="+91 98765 43210"
-                  value={form.phone} onChange={(e) => set('phone', e.target.value)} required />
+              {/* Phone shown as read-only (already verified via OTP) */}
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
+                <span className="text-green-600 text-xs">✓ Verified number:</span>
+                <span className="text-sm font-semibold text-gray-800">+91 {user?.phone}</span>
               </div>
 
               <div>
@@ -266,11 +313,9 @@ export default function RegisterShopPage() {
               </div>
 
               <button
-                onClick={() => {
-                  if (!form.name || !form.phone) { toast.error('Name and phone are required'); return }
-                  setStep(2)
-                }}
-                className="btn-primary w-full justify-center mt-2"
+                onClick={() => setStep(2)}
+                disabled={!form.name.trim()}
+                className="btn-primary w-full justify-center mt-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Next: Location & Delivery
               </button>
@@ -369,7 +414,9 @@ export default function RegisterShopPage() {
                 <button type="button" onClick={() => setStep(1)} className="btn-secondary flex-1">
                   Back
                 </button>
-                <button type="submit" disabled={saving} className="btn-primary flex-1 justify-center">
+                <button type="submit"
+                  disabled={saving || !form.address.trim() || !form.city.trim() || !form.lat || !form.lng}
+                  className="btn-primary flex-1 justify-center disabled:opacity-40 disabled:cursor-not-allowed">
                   {saving ? 'Registering…' : 'Submit for Approval'}
                 </button>
               </div>

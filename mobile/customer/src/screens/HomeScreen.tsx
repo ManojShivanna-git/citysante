@@ -23,112 +23,164 @@ const MODES: { key: ShopMode; label: string; icon: string; desc: string }[] = [
   { key: 'list', label: 'Browse Shops',  icon: 'list',        desc: 'Browse all shops' },
 ]
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function isRealImage(url: string | null | undefined): boolean {
+  if (!url) return false
+  if (url.includes('/avatar') || url.includes('l_text') || url.includes('placeholder')) return false
+  if (url.includes('res.cloudinary.com') && !/\.(jpg|jpeg|png|webp|gif|svg)(\?|$)/i.test(url)) return false
+  return true
+}
+
+const CAT_EMOJI_MAP: Record<string, string> = {
+  dairy: '🥛', vegetable: '🥦', fruit: '🍎', grocery: '🛒',
+  beverage: '🥤', snack: '🍿', bakery: '🍞',
+}
+function catEmoji(name: string): string {
+  const lower = (name || '').toLowerCase()
+  for (const [k, v] of Object.entries(CAT_EMOJI_MAP)) {
+    if (lower.includes(k)) return v
+  }
+  return '📦'
+}
+
+function parseArea(address: string | undefined, city: string): string {
+  if (address) {
+    const parts = address.split(',').map((p) => p.trim()).filter(Boolean)
+    if (parts.length >= 2) return parts[parts.length - 2]
+  }
+  return city
+}
+
+// ── Shop Card ─────────────────────────────────────────────────────────────────
+
 function ShopCard({ shop, onPress }: { shop: Shop; onPress: () => void }) {
-  const badgeColors: Record<string, string> = {
-    citysante_verified: '#3b82f6',
-    zones_best:         '#8b5cf6',
-    top_seller:         '#ef4444',
-    fast_delivery:      '#22c55e',
-  }
-  const badgeLabels: Record<string, string> = {
-    citysante_verified: '✓ Verified',
-    zones_best:         '🏆 Zone\'s Best',
-    top_seller:         '🔥 Top Seller',
-    fast_delivery:      '⚡ Fast',
-  }
+  const coverUri = isRealImage(shop.cover_url) ? getImageUrl(shop.cover_url) : null
+  const logoUri  = isRealImage(shop.logo_url)  ? getImageUrl(shop.logo_url)  : null
+  const area     = parseArea(shop.address, shop.city)
 
   return (
     <TouchableOpacity style={styles.shopCard} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.shopCardTop}>
-        <View style={styles.shopAvatar}>
-          {getImageUrl(shop.logo_url)
-            ? <Image source={{ uri: getImageUrl(shop.logo_url) }} style={styles.shopAvatarImg} resizeMode="cover" />
-            : <Text style={styles.shopAvatarText}>{shop.name.charAt(0)}</Text>
-          }
-        </View>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={styles.shopName}>{shop.name}</Text>
-          <Text style={styles.shopAddress} numberOfLines={1}>{shop.address}</Text>
-          <View style={styles.shopMeta}>
-            <Ionicons name="star" size={13} color="#f59e0b" />
-            <Text style={styles.shopRating}>{shop.rating ? parseFloat(String(shop.rating)).toFixed(1) : '—'}</Text>
-            <Text style={styles.shopDot}>·</Text>
-            <Ionicons name="time-outline" size={13} color="#9ca3af" />
-            <Text style={styles.shopMetaText}>{shop.delivery_time_min}–{shop.delivery_time_max} min</Text>
-            <Text style={styles.shopDot}>·</Text>
-            <Ionicons name="bicycle-outline" size={13} color="#9ca3af" />
-            <Text style={styles.shopMetaText}>
-              {shop.delivery_fee > 0 ? `₹${shop.delivery_fee}` : 'Free'}
+      {/* Left: cover image */}
+      <View style={styles.shopCover}>
+        {coverUri
+          ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+          : <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ fontSize: 30 }}>🏪</Text>
+            </View>
+        }
+        {!shop.is_open && (
+          <View style={styles.shopCoverClosed}>
+            <Text style={styles.shopCoverClosedText}>Closed</Text>
+          </View>
+        )}
+        {logoUri && (
+          <View style={styles.shopLogoBadge}>
+            <Image source={{ uri: logoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          </View>
+        )}
+      </View>
+
+      {/* Right: info */}
+      <View style={styles.shopInfo}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={styles.shopName} numberOfLines={1}>{shop.name}</Text>
+          <View style={[styles.openPill, { backgroundColor: shop.is_open ? '#dcfce7' : '#f3f4f6' }]}>
+            <Text style={[styles.openPillText, { color: shop.is_open ? '#16a34a' : '#9ca3af' }]}>
+              {shop.is_open ? 'Open' : 'Closed'}
             </Text>
           </View>
         </View>
-        <View style={[styles.openBadge, { backgroundColor: shop.is_open ? '#dcfce7' : '#f3f4f6' }]}>
-          <Text style={[styles.openBadgeText, { color: shop.is_open ? '#16a34a' : '#9ca3af' }]}>
-            {shop.is_open ? 'Open' : 'Closed'}
-          </Text>
-        </View>
-      </View>
 
-      {Array.isArray(shop.badges) && shop.badges.length > 0 && (
-        <View style={styles.badgeRow}>
-          {shop.badges.map((b) => (
-            <View key={b} style={[styles.badge, { backgroundColor: (badgeColors[b] ?? '#6b7280') + '15' }]}>
-              <Text style={[styles.badgeText, { color: badgeColors[b] ?? '#6b7280' }]}>
-                {badgeLabels[b] ?? b}
+        <View style={styles.shopMeta}>
+          <Ionicons name="star" size={11} color="#f59e0b" />
+          <Text style={styles.shopRating}>{shop.rating ? parseFloat(String(shop.rating)).toFixed(1) : '—'}</Text>
+          <Text style={styles.shopDot}>·</Text>
+          <Ionicons name="time-outline" size={11} color="#9ca3af" />
+          <Text style={styles.shopMetaText}>{shop.delivery_time_min}–{shop.delivery_time_max}m</Text>
+          <Text style={styles.shopDot}>·</Text>
+          <Ionicons name="bicycle-outline" size={11} color="#9ca3af" />
+          <Text style={styles.shopMetaText}>{shop.delivery_fee > 0 ? `₹${shop.delivery_fee}` : 'Free'}</Text>
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
+          <Ionicons name="location-outline" size={10} color="#9ca3af" />
+          <Text style={styles.shopArea} numberOfLines={1}>{area}</Text>
+        </View>
+
+        <View style={styles.shopFooter}>
+          <Text style={styles.shopMin}>Min ₹{shop.minimum_order}</Text>
+          {Array.isArray(shop.badges) && shop.badges.filter(Boolean).length > 0 && (
+            <View style={styles.shopBadge}>
+              <Text style={styles.shopBadgeText}>
+                {shop.badges.filter(Boolean)[0] === 'citysante_verified' ? '✓ Verified'
+                  : shop.badges.filter(Boolean)[0] === 'fast_delivery' ? '⚡ Fast'
+                  : shop.badges.filter(Boolean)[0] === 'top_seller' ? '🔥 Top'
+                  : '🏆 Best'}
               </Text>
             </View>
-          ))}
+          )}
         </View>
-      )}
-
-      <View style={styles.shopFooter}>
-        <Text style={styles.shopMin}>Min. order ₹{shop.minimum_order}</Text>
-        <Text style={styles.shopExplore}>Explore →</Text>
       </View>
     </TouchableOpacity>
   )
 }
 
+// ── Product Card ───────────────────────────────────────────────────────────────
+
 function ProductCard({ item, onPress }: { item: any; onPress: () => void }) {
   const { addItem } = useCartStore()
-  const imgUrl = getImageUrl(item.image_url)
-  const price = item.discount_price ?? item.price
-  const original = item.discount_price ? item.price : null
+  const imgUrl  = isRealImage(item.image_url) ? getImageUrl(item.image_url) : null
+  const price   = item.effective_price ?? item.discount_price ?? item.price
+  const original = (item.discount_price && item.discount_price < item.price) ? item.price : null
+  const savings  = original ? Math.round(original - price) : 0
 
   return (
     <TouchableOpacity style={styles.productCard} onPress={onPress} activeOpacity={0.85}>
+      {/* Image */}
       <View style={styles.productImgBox}>
         {imgUrl
-          ? <Image source={{ uri: imgUrl }} style={styles.productImg} resizeMode="cover" />
-          : <Ionicons name="image-outline" size={32} color="#d1d5db" />
+          ? <Image source={{ uri: imgUrl }} style={styles.productImg} resizeMode="contain" />
+          : <Text style={{ fontSize: 30 }}>{catEmoji(item.category_name)}</Text>
         }
+        {savings > 0 && (
+          <View style={styles.savingsBadge}>
+            <Text style={styles.savingsBadgeText}>₹{savings} OFF</Text>
+          </View>
+        )}
       </View>
-      <View style={{ flex: 1, paddingHorizontal: 10 }}>
-        <Text style={styles.productName} numberOfLines={1}>{item.product_name}</Text>
-        <Text style={styles.productShop} numberOfLines={1}>{item.shop_name}</Text>
-        <Text style={styles.productUnit}>{item.unit_value} {item.unit}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-          <Text style={styles.productPrice}>₹{price}</Text>
+
+      {/* Info */}
+      <View style={{ flex: 1, paddingHorizontal: 10, justifyContent: 'center' }}>
+        <Text style={styles.productName} numberOfLines={2}>{item.product_name}</Text>
+        <Text style={styles.productUnit}>{item.unit_value} {item.unit}{item.brand ? ` · ${item.brand}` : ''}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 }}>
+          <View style={styles.priceTag}>
+            <Text style={styles.priceTagText}>₹{Number(price).toFixed(0)}</Text>
+          </View>
           {original && <Text style={styles.productOriginal}>₹{original}</Text>}
         </View>
+        <Text style={styles.productShop} numberOfLines={1}>🏪 {item.shop_name}</Text>
       </View>
+
+      {/* ADD */}
       <TouchableOpacity
         style={styles.addBtn}
         onPress={() => addItem({
           shop_product_id: item.id,
-          product_id: item.product_id,
-          name: item.product_name,
-          price: item.price,
-          discount_price: item.discount_price ?? null,
-          image_url: item.image_url,
-          unit: item.unit,
-          unit_value: item.unit_value,
-          shop_id: item.shop_id,
-          shop_name: item.shop_name,
-          quantity: 1,
+          product_id:      item.product_id,
+          name:            item.product_name,
+          price:           item.price,
+          discount_price:  item.discount_price ?? null,
+          image_url:       item.image_url,
+          unit:            item.unit,
+          unit_value:      item.unit_value,
+          shop_id:         item.shop_id,
+          shop_name:       item.shop_name,
+          quantity:        1,
         })}
       >
-        <Ionicons name="add" size={18} color="#fff" />
+        <Text style={styles.addBtnText}>ADD</Text>
       </TouchableOpacity>
     </TouchableOpacity>
   )
@@ -548,29 +600,40 @@ const styles = StyleSheet.create({
   // ── Shop cards ────────────────────────────────────────────────────────────
   shopCard: {
     backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 12,
-    borderRadius: 16, padding: 16,
+    borderRadius: 16, flexDirection: 'row', overflow: 'hidden',
     borderWidth: 1, borderColor: '#f3f4f6',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6,
-    shadowOffset: { width: 0, height: 1 }, elevation: 2,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 }, elevation: 3,
+    height: 110,
   },
-  shopCardTop:    { flexDirection: 'row', alignItems: 'flex-start' },
-  shopAvatar:     { width: 48, height: 48, borderRadius: 14, backgroundColor: '#fff1f2', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  shopAvatarImg:  { width: 48, height: 48 },
-  shopAvatarText: { fontSize: 20, fontWeight: '800', color: RED },
-  shopName:       { fontSize: 15, fontWeight: '700', color: '#111', marginBottom: 2 },
-  shopAddress:    { fontSize: 12, color: '#6b7280', marginBottom: 4 },
-  shopMeta:       { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  shopRating:     { fontSize: 12, fontWeight: '600', color: '#111' },
-  shopDot:        { color: '#d1d5db', fontSize: 12 },
-  shopMetaText:   { fontSize: 12, color: '#6b7280' },
-  openBadge:      { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginLeft: 4 },
-  openBadgeText:  { fontSize: 11, fontWeight: '700' },
-  badgeRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  badge:          { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  badgeText:      { fontSize: 11, fontWeight: '600' },
-  shopFooter:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  shopMin:        { fontSize: 12, color: '#9ca3af' },
-  shopExplore:    { fontSize: 12, fontWeight: '600', color: RED },
+  shopCover: {
+    width: 100, position: 'relative',
+  },
+  shopCoverClosed: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  shopCoverClosedText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  shopLogoBadge: {
+    position: 'absolute', bottom: 6, left: 6,
+    width: 26, height: 26, borderRadius: 8,
+    borderWidth: 2, borderColor: '#fff',
+    overflow: 'hidden', backgroundColor: '#fff',
+  },
+  shopInfo:     { flex: 1, padding: 10, justifyContent: 'space-between' },
+  shopName:     { fontSize: 14, fontWeight: '700', color: '#111', flex: 1, marginRight: 4 },
+  shopMeta:     { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3, flexWrap: 'wrap' },
+  shopRating:   { fontSize: 11, fontWeight: '600', color: '#111' },
+  shopDot:      { color: '#d1d5db', fontSize: 11 },
+  shopMetaText: { fontSize: 11, color: '#6b7280' },
+  shopArea:     { fontSize: 10, color: '#9ca3af', flex: 1 },
+  openPill:     { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  openPillText: { fontSize: 10, fontWeight: '700' },
+  shopFooter:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  shopMin:      { fontSize: 11, color: '#9ca3af' },
+  shopBadge:    { backgroundColor: '#fff7ed', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  shopBadgeText:{ fontSize: 10, fontWeight: '700', color: '#ea580c' },
 
   center:    { padding: 40, alignItems: 'center' },
   emptyText: { fontSize: 15, color: '#9ca3af', marginTop: 12 },
@@ -584,21 +647,28 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 }, elevation: 2,
   },
   productImgBox: {
-    width: 64, height: 64, borderRadius: 12,
-    backgroundColor: '#f9fafb', alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden',
+    width: 72, height: 72, borderRadius: 12,
+    backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden', position: 'relative',
   },
-  productImg:      { width: 64, height: 64 },
-  productName:     { fontSize: 14, fontWeight: '700', color: '#111' },
-  productShop:     { fontSize: 12, color: '#6b7280', marginTop: 2 },
-  productUnit:     { fontSize: 11, color: '#9ca3af', marginTop: 1 },
-  productPrice:    { fontSize: 14, fontWeight: '800', color: '#111' },
-  productOriginal: { fontSize: 12, color: '#9ca3af', textDecorationLine: 'line-through' },
+  productImg:      { width: 72, height: 72 },
+  savingsBadge: {
+    position: 'absolute', top: 0, left: 0,
+    backgroundColor: '#16a34a', borderRadius: 4,
+    paddingHorizontal: 4, paddingVertical: 1,
+  },
+  savingsBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800' },
+  productName:     { fontSize: 13, fontWeight: '700', color: '#111', lineHeight: 18 },
+  productShop:     { fontSize: 10, color: '#9ca3af', marginTop: 3 },
+  productUnit:     { fontSize: 11, color: '#6b7280', marginTop: 1 },
+  productOriginal: { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through' },
+  priceTag:        { backgroundColor: '#16a34a', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  priceTagText:    { color: '#fff', fontSize: 13, fontWeight: '800' },
   addBtn: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: RED, alignItems: 'center', justifyContent: 'center',
-    marginLeft: 8,
+    borderWidth: 1.5, borderColor: RED, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 7, marginLeft: 8,
   },
+  addBtnText: { color: RED, fontWeight: '800', fontSize: 12 },
 
   // ── Floating cart bar ─────────────────────────────────────────────────────
   cartBar: {

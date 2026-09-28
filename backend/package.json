@@ -12,6 +12,7 @@
     "db:backfill-images": "ts-node src/db/backfill-images.ts",
     "db:reset-and-reseed": "ts-node src/db/reset-and-reseed.ts",
     "db:add-billing-column": "ts-node src/db/add-billing-column.ts",
+    "db:add-shop-images": "ts-node src/db/add-shop-images.ts",
     "db:fix-zone-coverage-view": "ts-node src/db/fix-zone-coverage-view.ts"
   },
   "dependencies": {

@@ -18,7 +18,7 @@ interface ShopDetail {
   delivery_fee: number; minimum_order: number; delivery_time_min: number
   delivery_time_max: number; rating: number; total_reviews: number
   is_open: boolean; badges: string[]; menu: Menu[]; zone_category: string
-  distance?: number | null
+  distance?: number | null; cover_url?: string | null
 }
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -155,6 +155,8 @@ export default function ShopPage() {
   const [shop, setShop]         = useState<ShopDetail | null>(null)
   const [loading, setLoading]   = useState(true)
   const [activeCategory, setActiveCategory] = useState('')
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
+  const [galleryImgs, setGalleryImgs] = useState<string[]>([])
   const { carts, addItem, updateQty } = useCartStore()
   const items = carts.flatMap((c) => c.items)
   // Cart bar shows the WHOLE cart total (all shops), not just this shop's —
@@ -171,6 +173,12 @@ export default function ShopPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
+    // Fetch gallery images
+    import('../../services/api').then(({ default: api }) =>
+      api.get(`/shops/${id}/images`).then((r) =>
+        setGalleryImgs((r.data.data || []).map((img: any) => img.image_url))
+      ).catch(() => {})
+    )
   }, [id])
 
   const getQty = (spId: string) => items.find((i) => i.shopProductId === spId)?.quantity || 0
@@ -195,77 +203,89 @@ export default function ShopPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Shop header */}
-      <div className="bg-[#c0392b] text-white px-4 pt-6 pb-0 relative overflow-hidden">
-        {/* Subtle circles */}
-        <div className="absolute -top-10 -right-10 w-44 h-44 bg-white/5 rounded-full pointer-events-none" />
-        <div className="absolute top-4 right-20 w-20 h-20 bg-white/5 rounded-full pointer-events-none" />
-
-        <div className="relative flex items-center gap-4 pb-5">
-          {/* Logo */}
-          <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center shrink-0 border border-white/20 shadow-md overflow-hidden">
-            {getImgUrl(shop.logo_url)
-              ? <img src={getImgUrl(shop.logo_url)!} alt={shop.name} className="w-full h-full object-cover" />
-              : <span className="text-3xl">{CATEGORY_EMOJI[shop.zone_category] ?? '🏪'}</span>}
-          </div>
-
-          {/* Info */}
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-extrabold leading-tight truncate">{shop.name}</h1>
-            {shop.description && (
-              <p className="text-white/65 text-xs mt-0.5 line-clamp-1">{shop.description}</p>
-            )}
-            <div className="flex items-center gap-3 mt-2">
-              <span className="flex items-center gap-1 text-xs font-semibold">
-                <Star size={11} fill="currentColor" className="text-yellow-300" />
-                <span>{shop.rating || '—'}</span>
-                {shop.total_reviews > 0 && <span className="text-white/60">({shop.total_reviews})</span>}
-              </span>
-              <span className="text-white/30">·</span>
-              <span className="flex items-center gap-1 text-xs text-white/80">
-                <Clock size={11} />
-                {shop.delivery_time_min}–{shop.delivery_time_max} min
-              </span>
-              <span className="text-white/30">·</span>
-              <span className="text-xs text-white/80">{shop.distance ? `${Number(shop.distance).toFixed(1)} km` : ''}</span>
-            </div>
-          </div>
+      {/* ── Shop header ── */}
+      <div className="bg-white">
+        {/* Cover image */}
+        <div
+          className="relative h-48 overflow-hidden bg-gradient-to-br from-red-500 to-orange-400 cursor-pointer"
+          onClick={() => { const u = getImgUrl(shop.cover_url); if (u) setLightboxImg(u) }}
+        >
+          {getImgUrl(shop.cover_url)
+            ? <img src={getImgUrl(shop.cover_url)!} alt="" className="w-full h-full object-cover" />
+            : <div className="w-full h-full" />
+          }
+          {getImgUrl(shop.cover_url) && (
+            <div className="absolute bottom-2 right-2 bg-black/40 text-white text-[10px] font-semibold px-2 py-1 rounded-full">Tap to view</div>
+          )}
         </div>
 
-        {/* Stats row — white cards on the bottom edge */}
-        <div className="flex gap-3 relative -mb-5">
-          {[
-            { label: 'Delivery fee', value: `₹${shop.delivery_fee}`, icon: '🛵' },
-            { label: 'Min order',    value: `₹${shop.minimum_order}`, icon: '🛒' },
-            { label: 'Reviews',      value: shop.total_reviews || '—', icon: '⭐' },
-          ].map(({ label, value, icon }) => (
-            <div key={label} className="flex-1 bg-white rounded-2xl px-3 py-3 text-center shadow-md">
-              <div className="text-base mb-0.5">{icon}</div>
-              <div className="font-bold text-gray-900 text-sm">{value}</div>
-              <div className="text-[10px] text-gray-400 mt-0.5">{label}</div>
+        {/* Info section */}
+        <div className="px-4 pt-4 pb-0">
+          <div className="flex items-start gap-3">
+            {/* Logo */}
+            <div
+              className={`w-14 h-14 shrink-0 rounded-xl border border-gray-100 shadow overflow-hidden bg-red-50 flex items-center justify-center ${getImgUrl(shop.logo_url) ? 'cursor-pointer' : ''}`}
+              onClick={() => { const u = getImgUrl(shop.logo_url); if (u) setLightboxImg(u) }}
+            >
+              {getImgUrl(shop.logo_url)
+                ? <img src={getImgUrl(shop.logo_url)!} alt={shop.name} className="w-full h-full object-cover" />
+                : <span className="text-2xl">{CATEGORY_EMOJI[shop.zone_category] ?? '🏪'}</span>}
             </div>
-          ))}
-        </div>
-
-        {/* Badges */}
-        {Array.isArray(shop.badges) && shop.badges.filter(Boolean).length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3 relative">
-            {shop.badges.filter(Boolean).map((b: string) => (
-              <span key={b} className="bg-white/20 text-white text-[10px] font-bold px-2.5 py-1 rounded-full border border-white/20">
-                {b === 'citysante_verified' ? '✓ Verified' : b === 'zones_best' ? '🏆 Zone\'s Best' :
-                 b === 'top_seller' ? '🔥 Top Seller' : b === 'fast_delivery' ? '⚡ Fast Delivery' : b}
-              </span>
-            ))}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-extrabold text-gray-900 truncate">{shop.name}</h1>
+                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${shop.is_open ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {shop.is_open ? 'Open' : 'Closed'}
+                </span>
+              </div>
+              {shop.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{shop.description}</p>}
+            </div>
           </div>
-        )}
+
+          {/* Stats row */}
+          <div className="flex items-center gap-3 mt-3 pb-3 border-b border-gray-100 flex-wrap">
+            <span className="flex items-center gap-1 text-sm font-bold text-gray-800">
+              <Star size={13} fill="#f59e0b" className="text-amber-400" /> {shop.rating || '—'}
+              {shop.total_reviews > 0 && <span className="text-gray-400 font-normal text-xs">({shop.total_reviews})</span>}
+            </span>
+            <span className="text-gray-200">|</span>
+            <span className="text-sm text-gray-600 flex items-center gap-1"><Clock size={13} />{shop.delivery_time_min}–{shop.delivery_time_max} min</span>
+            <span className="text-gray-200">|</span>
+            <span className="text-sm text-gray-600">₹{shop.delivery_fee} delivery</span>
+            <span className="text-gray-200">|</span>
+            <span className="text-sm text-gray-600">₹{shop.minimum_order} min</span>
+          </div>
+
+          {/* Badges */}
+          {Array.isArray(shop.badges) && shop.badges.filter(Boolean).length > 0 && (
+            <div className="flex flex-wrap gap-1.5 py-2.5 border-b border-gray-100">
+              {shop.badges.filter(Boolean).map((b: string) => (
+                <span key={b} className="bg-orange-50 text-orange-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-orange-100">
+                  {b === 'citysante_verified' ? '✓ Verified' : b === 'zones_best' ? '🏆 Zone\'s Best' :
+                   b === 'top_seller' ? '🔥 Top Seller' : b === 'fast_delivery' ? '⚡ Fast Delivery' : b}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Map */}
       {shop.lat && shop.lng && (
         <div className="px-4 pt-8 pb-3 bg-white border-b border-gray-100">
-          <div className="flex items-center gap-1.5 mb-2 text-xs text-gray-500">
-            <MapPin size={12} className="text-brand-600" />
-            <span>{shop.address}, {shop.city}</span>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <MapPin size={12} className="text-brand-600" />
+              <span>{shop.address}, {shop.city}</span>
+            </div>
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${shop.lat},${shop.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-full transition-colors shrink-0"
+            >
+              <MapPin size={12} /> Directions
+            </a>
           </div>
           <ShopMap
             lat={Number(shop.lat)}
@@ -273,6 +293,24 @@ export default function ShopPage() {
             name={shop.name}
             address={`${shop.address}, ${shop.city}`}
           />
+        </div>
+      )}
+
+      {/* Photo gallery */}
+      {galleryImgs.length > 0 && (
+        <div className="bg-white border-b border-gray-100 px-4 py-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Photos ({galleryImgs.length})</p>
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            {galleryImgs.map((url, i) => (
+              <button
+                key={i}
+                onClick={() => setLightboxImg(getImgUrl(url))}
+                className="shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-gray-100 hover:opacity-90 transition-opacity"
+              >
+                <img src={getImgUrl(url)!} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -355,6 +393,20 @@ export default function ShopPage() {
               </div>
             </Link>
           </div>
+        </div>
+      )}
+
+      {/* Cover image lightbox */}
+      {lightboxImg && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxImg(null)}
+        >
+          <img src={lightboxImg} alt="" className="max-w-full max-h-full rounded-xl object-contain shadow-2xl" />
+          <button
+            className="absolute top-4 right-4 text-white bg-black/40 rounded-full w-10 h-10 flex items-center justify-center text-xl hover:bg-black/60"
+            onClick={() => setLightboxImg(null)}
+          >✕</button>
         </div>
       )}
     </div>

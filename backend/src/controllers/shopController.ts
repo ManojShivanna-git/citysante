@@ -29,7 +29,7 @@ export const getNearbyShops = async (req: Request, res: Response, next: NextFunc
     const result = await query(
       `SELECT
         s.id, s.name, s.description, s.logo_url, s.cover_url,
-        s.city, s.delivery_fee, s.minimum_order, s.delivery_time_min,
+        s.city, s.address, s.delivery_fee, s.minimum_order, s.delivery_time_min,
         s.delivery_time_max, s.rating, s.total_reviews, s.is_open,
         s.zone_id, s.zone_category,
         ARRAY_AGG(DISTINCT sb.badge) FILTER (WHERE sb.is_active = TRUE) AS badges,
@@ -332,4 +332,55 @@ export const getMyBilling = async (req: AuthRequest, res: Response, next: NextFu
   } catch (err) {
     next(err)
   }
+}
+
+// ─── Shop Images ─────────────────────────────────────────────────────────────
+
+export const getShopImages = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params
+    const result = await query(
+      `SELECT id, image_url, display_order FROM shop_images WHERE shop_id = $1 ORDER BY display_order ASC, created_at ASC`,
+      [id]
+    )
+    res.json({ success: true, data: result.rows })
+  } catch (err) { next(err) }
+}
+
+export const addShopImage = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) throw createError('No image file provided', 400)
+
+    // Get the shop for this owner
+    const shopResult = await query(`SELECT id FROM shops WHERE owner_id = $1`, [req.user?.userId])
+    if (shopResult.rows.length === 0) throw createError('Shop not found', 404)
+    const shopId = shopResult.rows[0].id
+
+    // Enforce max 10 images
+    const countResult = await query(`SELECT COUNT(*) FROM shop_images WHERE shop_id = $1`, [shopId])
+    if (parseInt(countResult.rows[0].count) >= 10) throw createError('Maximum 10 images allowed per shop', 400)
+
+    const image_url = `/uploads/shops/${req.file.filename}`
+    const result = await query(
+      `INSERT INTO shop_images (shop_id, image_url, display_order) VALUES ($1, $2, (SELECT COALESCE(MAX(display_order),0)+1 FROM shop_images WHERE shop_id=$1)) RETURNING *`,
+      [shopId, image_url]
+    )
+    res.json({ success: true, data: result.rows[0] })
+  } catch (err) { next(err) }
+}
+
+export const deleteShopImage = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { imageId } = req.params
+    const shopResult = await query(`SELECT id FROM shops WHERE owner_id = $1`, [req.user?.userId])
+    if (shopResult.rows.length === 0) throw createError('Shop not found', 404)
+    const shopId = shopResult.rows[0].id
+
+    const result = await query(
+      `DELETE FROM shop_images WHERE id = $1 AND shop_id = $2 RETURNING image_url`,
+      [imageId, shopId]
+    )
+    if (result.rows.length === 0) throw createError('Image not found', 404)
+    res.json({ success: true, message: 'Image deleted' })
+  } catch (err) { next(err) }
 }

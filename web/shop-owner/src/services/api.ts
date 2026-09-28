@@ -44,6 +44,15 @@ export const shopApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+  getImages: (shopId: string) => api.get(`/shops/${shopId}/images`),
+  addImage: (file: File) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    return api.post('/shops/my/images?type=shops', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  deleteImage: (imageId: string) => api.delete(`/shops/my/images/${imageId}`),
 }
 
 export const billingApi = {

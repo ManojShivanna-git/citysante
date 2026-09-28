@@ -8,6 +8,14 @@ import clsx from 'clsx'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function getArea(shop: Shop): string {
+  if (shop.address) {
+    const parts = shop.address.split(',').map((p) => p.trim()).filter(Boolean)
+    if (parts.length >= 2) return parts[parts.length - 2]
+  }
+  return shop.city
+}
+
 function isRealImage(url: string | null | undefined): boolean {
   if (!url) return false
   if (url.includes('/avatar') || url.includes('l_text') || url.includes('placeholder')) return false
@@ -31,25 +39,31 @@ const BADGE_ICONS: Record<string, string> = {
 
 function ShopCard({ shop }: { shop: Shop }) {
   const cat      = CATEGORY_EMOJI[shop.zone_category] ?? { emoji: '🏪', bg: 'from-orange-50 via-amber-50 to-yellow-50' }
-  const logoUrl  = isRealImage(shop.logo_url) ? getImgUrl(shop.logo_url) : null
+  const coverUrl = isRealImage(shop.cover_url) ? getImgUrl(shop.cover_url) : null
+  const logoUrl  = isRealImage(shop.logo_url)  ? getImgUrl(shop.logo_url)  : null
 
   return (
     <Link
       to={`/shop/${shop.id}`}
       className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group flex flex-row h-32"
     >
-      {/* Left image */}
-      <div className={`w-32 shrink-0 relative flex items-center justify-center overflow-hidden bg-gradient-to-br ${cat.bg}`}>
-        {logoUrl ? (
-          <img src={logoUrl} alt={shop.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-        ) : (
-          <span className="text-6xl group-hover:scale-110 transition-transform duration-200 drop-shadow-sm select-none">
-            {cat.emoji}
-          </span>
-        )}
+      {/* Cover image (left) */}
+      <div className={`w-36 shrink-0 relative overflow-hidden bg-gradient-to-br ${cat.bg}`}>
+        {coverUrl
+          ? <img src={coverUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          : <div className="w-full h-full flex items-center justify-center">
+              <span className="text-5xl opacity-30">{cat.emoji}</span>
+            </div>
+        }
         {!shop.is_open && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <span className="text-white font-bold text-[10px] tracking-widest uppercase">Closed</span>
+          </div>
+        )}
+        {/* Logo overlay */}
+        {logoUrl && (
+          <div className="absolute bottom-2 left-2 w-8 h-8 rounded-lg overflow-hidden border-2 border-white shadow">
+            <img src={logoUrl} alt="" className="w-full h-full object-cover" />
           </div>
         )}
       </div>
@@ -59,7 +73,7 @@ function ShopCard({ shop }: { shop: Shop }) {
         <div>
           <div className="flex items-center justify-between gap-1 mb-1">
             <h3 className="font-bold text-gray-900 text-sm leading-tight truncate flex-1">{shop.name}</h3>
-            {shop.is_open && <span className="shrink-0 w-2 h-2 rounded-full bg-green-500 shadow-sm shadow-green-200" />}
+            {shop.is_open && <span className="shrink-0 w-2 h-2 rounded-full bg-green-500" />}
           </div>
           {Array.isArray(shop.badges) && shop.badges.filter(Boolean).length > 0 && (
             <span className="inline-block bg-orange-50 text-orange-600 text-[9px] px-2 py-0.5 rounded-full font-semibold border border-orange-100">
@@ -68,19 +82,20 @@ function ShopCard({ shop }: { shop: Shop }) {
           )}
         </div>
         <div className="flex items-center gap-2 text-[11px]">
-          <span className="flex items-center gap-0.5 font-semibold text-amber-500">
+          <span className="flex items-center gap-0.5 font-bold text-amber-500">
             <Star size={10} fill="currentColor" /> {shop.rating || '—'}
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-gray-200">·</span>
           <span className="flex items-center gap-0.5 text-gray-500">
-            <Clock size={10} /> {shop.delivery_time_min}–{shop.delivery_time_max}m
+            <Clock size={10} /> {shop.delivery_time_min}–{shop.delivery_time_max} min
           </span>
-          <span className="text-gray-300">|</span>
-          <span className="flex items-center gap-0.5 text-gray-500">
-            <MapPin size={10} /> {shop.distance ? `${shop.distance.toFixed(1)}km` : '—'}
-          </span>
+          <span className="text-gray-200">·</span>
+          <span className="text-gray-500">{shop.distance ? `${shop.distance.toFixed(1)} km` : '—'}</span>
         </div>
-        <div className="flex items-center justify-between text-[11px] pt-2 border-t border-gray-50">
+        <div className="text-[11px] text-gray-400 flex items-center gap-0.5">
+          <MapPin size={10} /> {getArea(shop)}
+        </div>
+        <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-gray-50">
           <span className="text-gray-400">Min ₹{shop.minimum_order}</span>
           <span className="font-semibold text-orange-500">Del ₹{shop.delivery_fee}</span>
         </div>
@@ -122,7 +137,6 @@ export default function ShopsPage() {
   const [loading, setLoading] = useState(true)
   const [q, setQ]             = useState('')
   const [filter, setFilter]   = useState('all')
-  const [nearestFirst, setNearestFirst] = useState(false)
   const inputRef              = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -142,12 +156,6 @@ export default function ShopsPage() {
         filter === 'open'      ? s.is_open :
         s.zone_category === filter
       return matchQ && matchF
-    })
-    .sort((a, b) => {
-      if (!nearestFirst) return 0
-      const da = a.distance ?? Infinity
-      const db = b.distance ?? Infinity
-      return da - db
     })
 
   return (
@@ -200,21 +208,7 @@ export default function ShopsPage() {
           </button>
         ))}
 
-        {/* Nearest first toggle */}
-        <button
-          onClick={() => setNearestFirst((v) => !v)}
-          className={clsx(
-            'shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all',
-            nearestFirst
-              ? 'text-white border-transparent shadow-sm'
-              : 'bg-white text-gray-600 border-gray-200 hover:border-red-200'
-          )}
-          style={nearestFirst ? { background: 'linear-gradient(135deg, #dc2626, #f59e0b)', border: 'none' } : undefined}
-        >
-          <MapPin size={11} /> Nearest first
-        </button>
-
-        {!loading && visible.length > 0 && (
+{!loading && visible.length > 0 && (
           <span className="ml-2 shrink-0 text-xs text-gray-400 self-center pr-1">
             {visible.length} shop{visible.length !== 1 ? 's' : ''}
           </span>
