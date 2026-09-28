@@ -22,7 +22,9 @@
         "ACCESS_COARSE_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "plugins": [
@@ -37,8 +39,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "8f9fe4bc-53e7-4e8a-8adb-1339e81f0103"
+        "projectId": "2aa2b3bd-196d-46f3-af5e-6763bf88bb37"
       }
-    }
+    },
+    "owner": "manojss"
   }
 }

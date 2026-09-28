@@ -16,7 +16,9 @@
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -31,8 +33,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "8f9fe4bc-53e7-4e8a-8adb-1339e81f0103"
+        "projectId": "37a33ff5-9c22-4f69-88e2-df956fcac889"
       }
-    }
+    },
+    "owner": "manojss"
   }
 }
