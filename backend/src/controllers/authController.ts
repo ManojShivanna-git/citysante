@@ -63,10 +63,17 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
       throw createError('Invalid role', 400)
     }
 
+    // Demo account for Google Play review — bypass OTP check
+    const DEMO_PHONE = '9000000000'
+    const DEMO_OTP   = '123456'
+    const isDemo = phone === DEMO_PHONE && otp === DEMO_OTP
+
     const storedOTP = await redis.get(RedisKeys.otp(phone))
     console.log(`🔍 verify-otp | phone="${phone}" submitted="${otp}" stored="${storedOTP}" expectedRole="${expectedRole}"`)
-    if (!storedOTP) throw createError('OTP expired — please request a new one', 400)
-    if (storedOTP !== otp) throw createError('Invalid OTP', 400)
+    if (!isDemo) {
+      if (!storedOTP) throw createError('OTP expired — please request a new one', 400)
+      if (storedOTP !== otp) throw createError('Invalid OTP', 400)
+    }
 
     await redis.del(RedisKeys.otp(phone))
 
