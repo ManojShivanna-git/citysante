@@ -20,7 +20,8 @@
         "googleMaps": {
           "apiKey": "AIzaSyDomYDJ9arv0ZY4DM-CYChxPTmV82QgBBw"
         }
-      }
+      },
+      "icon": "./assets/icon.png"
     },
     "ios": {
       "supportsTablet": false,
@@ -37,11 +38,14 @@
       "androidCollapsedTitle": "Isanthe"
     },
     "plugins": [
-      ["expo-build-properties", {
-        "android": {
-          "usesCleartextTraffic": true
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
         }
-      }],
+      ],
       "expo-secure-store",
       [
         "expo-notifications",
@@ -60,6 +64,7 @@
         "projectId": "52e16ee2-afa1-48cb-bc91-c44744298a37"
       }
     },
-    "owner": "manojss"
+    "owner": "manojss",
+    "icon": "./assets/icon.png"
   }
 }

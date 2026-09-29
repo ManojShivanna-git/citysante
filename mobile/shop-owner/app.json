@@ -19,7 +19,8 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "icon": "./assets/icon.png"
     },
     "plugins": [
       "expo-secure-store",
@@ -36,6 +37,7 @@
         "projectId": "37a33ff5-9c22-4f69-88e2-df956fcac889"
       }
     },
-    "owner": "manojss"
+    "owner": "manojss",
+    "icon": "./assets/icon.png"
   }
 }

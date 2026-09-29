@@ -25,7 +25,8 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
-      ]
+      ],
+      "icon": "./assets/icon.png"
     },
     "plugins": [
       [
@@ -42,6 +43,7 @@
         "projectId": "2aa2b3bd-196d-46f3-af5e-6763bf88bb37"
       }
     },
-    "owner": "manojss"
+    "owner": "manojss",
+    "icon": "./assets/icon.png"
   }
 }
