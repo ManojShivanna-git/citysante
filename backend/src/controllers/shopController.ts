@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express'
 import { query, transaction } from '../config/database'
 import { AuthRequest } from '../types'
 import { createError } from '../middleware/errorHandler'
+import { uploadToCloudinary } from '../middleware/upload'
 
 // ─── Get Nearby Shops ─────────────────────────────────────────────────────
 
@@ -246,7 +247,7 @@ export const uploadShopImage = async (req: AuthRequest, res: Response, next: Nex
     if (!req.file) throw createError('No image file provided', 400)
     const imageType = req.query.type === 'cover' ? 'cover' : 'logo'
     const field = imageType === 'cover' ? 'cover_url' : 'logo_url'
-    const image_url = `/uploads/shops/${req.file.filename}`
+    const image_url = await uploadToCloudinary(req)
 
     const result = await query(
       `UPDATE shops SET ${field} = $1, updated_at = NOW()
@@ -360,7 +361,7 @@ export const addShopImage = async (req: AuthRequest, res: Response, next: NextFu
     const countResult = await query(`SELECT COUNT(*) FROM shop_images WHERE shop_id = $1`, [shopId])
     if (parseInt(countResult.rows[0].count) >= 10) throw createError('Maximum 10 images allowed per shop', 400)
 
-    const image_url = `/uploads/shops/${req.file.filename}`
+    const image_url = await uploadToCloudinary(req)
     const result = await query(
       `INSERT INTO shop_images (shop_id, image_url, display_order) VALUES ($1, $2, (SELECT COALESCE(MAX(display_order),0)+1 FROM shop_images WHERE shop_id=$1)) RETURNING *`,
       [shopId, image_url]

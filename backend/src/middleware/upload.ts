@@ -1,52 +1,34 @@
 import multer from 'multer'
-import path from 'path'
-import fs from 'fs'
+import { v2 as cloudinary } from 'cloudinary'
 import { AuthRequest } from '../types'
 
-// Single shared upload handler for product/category/product-request images.
-//
-// Destination folder is chosen from `?type=products` / `?type=categories` /
-// `?type=requests` on the URL (NOT req.body — multer hasn't parsed the
-// multipart body fields yet when `destination` runs, but query params and
-// `req.user` — set by the `authenticate` middleware earlier in the chain —
-// are already available).
-//
-// Shop owners are force-routed into the `requests` folder no matter what
-// `type` they pass: only admins get to write into the curated `products` /
-// `categories` folders that back the master catalog.
-//
-// Saved files land in backend/public/uploads/<type>/ — the same folder the
-// static file server in index.ts (`/uploads`) already serves, and the same
-// folder seed.ts / the generated placeholder images live in.
+// Configure Cloudinary from env vars
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
+// Resolve which Cloudinary folder to use
+export function resolveUploadFolder(req: AuthRequest): string {
+  if (req.query.type === 'shops' || req.query.type === 'logo' || req.query.type === 'cover') return 'isanthe/shops'
+  if (req.user?.role === 'shop_owner') return 'isanthe/requests'
+  if (req.query.type === 'categories') return 'isanthe/categories'
+  if (req.query.type === 'requests')   return 'isanthe/requests'
+  return 'isanthe/products'
+}
+
+// Keep resolveUploadType for backwards compatibility
 export function resolveUploadType(req: AuthRequest): 'products' | 'categories' | 'requests' | 'shops' {
-  // Shop image uploads (logo / cover) must go to the shops folder
   if (req.query.type === 'shops' || req.query.type === 'logo' || req.query.type === 'cover') return 'shops'
-  // All other shop_owner uploads (product requests) go to requests folder
   if (req.user?.role === 'shop_owner') return 'requests'
   if (req.query.type === 'categories') return 'categories'
-  if (req.query.type === 'requests') return 'requests'
+  if (req.query.type === 'requests')   return 'requests'
   return 'products'
 }
 
-const storage = multer.diskStorage({
-  destination: (req, _file, cb) => {
-    const type = resolveUploadType(req as AuthRequest)
-    const dir = path.join(__dirname, '../../public/uploads', type)
-    fs.mkdirSync(dir, { recursive: true })
-    cb(null, dir)
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.png'
-    const base = path
-      .basename(file.originalname, ext)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 50)
-    cb(null, `${base || 'image'}-${Date.now()}${ext}`)
-  },
-})
+// Store file in memory, then upload to Cloudinary
+const storage = multer.memoryStorage()
 
 const fileFilter = (
   _req: AuthRequest,
@@ -65,3 +47,27 @@ export const uploadImage = multer({
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 })
+
+// Call this after multer middleware to upload buffer → Cloudinary
+// Returns the secure URL
+export async function uploadToCloudinary(req: AuthRequest): Promise<string> {
+  const file = req.file
+  if (!file) throw new Error('No file uploaded')
+
+  const folder = resolveUploadFolder(req)
+
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: 'image',
+        transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+      },
+      (error, result) => {
+        if (error || !result) return reject(error || new Error('Cloudinary upload failed'))
+        resolve(result.secure_url)
+      }
+    )
+    stream.end(file.buffer)
+  })
+}

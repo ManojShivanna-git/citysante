@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express'
 import { query } from '../config/database'
 import { AuthRequest } from '../types'
 import { createError } from '../middleware/errorHandler'
-import { resolveUploadType } from '../middleware/upload'
+import { uploadToCloudinary } from '../middleware/upload'
 
 // ─── Get All Categories ───────────────────────────────────────────────────
 
@@ -88,8 +88,7 @@ export const uploadProductImage = async (req: AuthRequest, res: Response, next: 
       res.status(400).json({ success: false, message: 'No image file provided' })
       return
     }
-    const type = resolveUploadType(req)
-    const image_url = `/uploads/${type}/${req.file.filename}`
+    const image_url = await uploadToCloudinary(req)
     res.json({ success: true, message: 'Image uploaded', data: { image_url } })
   } catch (err) {
     next(err)
