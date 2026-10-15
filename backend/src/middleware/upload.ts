@@ -1,5 +1,5 @@
 import multer from 'multer'
-import { v2 as cloudinary } from 'cloudinary'
+import { v2 as cloudinary, UploadApiErrorResponse, UploadApiResponse } from 'cloudinary'
 import { AuthRequest } from '../types'
 
 // Configure Cloudinary from env vars
@@ -63,7 +63,7 @@ export async function uploadToCloudinary(req: AuthRequest): Promise<string> {
         resource_type: 'image',
         transformation: [{ quality: 'auto', fetch_format: 'auto' }],
       },
-      (error, result) => {
+      (error: UploadApiErrorResponse | undefined, result: UploadApiResponse | undefined) => {
         if (error || !result) return reject(error || new Error('Cloudinary upload failed'))
         resolve(result.secure_url)
       }
