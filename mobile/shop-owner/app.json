@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.isanthe.shopowner",
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",

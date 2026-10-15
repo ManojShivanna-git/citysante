@@ -16,6 +16,7 @@
     },
     "android": {
       "package": "com.isanthe.rider",
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_FINE_LOCATION",
