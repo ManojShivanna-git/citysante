@@ -84,6 +84,8 @@ async function updateDatabase(urlMap: Map<string, string>, table: string, column
       updated += res.rowCount || 0
     }
     console.log(`  🗄️  ${table}.${column}: ${updated} rows updated`)
+  } catch (err: any) {
+    console.log(`  ⚠️  ${table}.${column}: skipped — ${err.message}`)
   } finally {
     client.release()
   }
@@ -120,9 +122,6 @@ async function main() {
 
   // Update products table
   await updateDatabase(productMap, 'products', 'image_url')
-
-  // Update shop_products table (may also store image_url)
-  await updateDatabase(productMap, 'shop_products', 'image_url')
 
   // Update categories table
   await updateDatabase(categoryMap, 'categories', 'image_url')
