@@ -124,7 +124,7 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
     res.json({
       success: true,
       message: isNewUser ? 'Account created successfully' : 'Login successful',
-      data: { user, isNewUser, ...tokens },
+      data: { user: { ...user, role: expectedRole }, isNewUser, ...tokens },
     })
   } catch (err) {
     next(err)
