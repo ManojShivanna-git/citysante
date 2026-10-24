@@ -101,7 +101,7 @@ export default function LoginPage() {
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3" />
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-16">
-            <div className="w-10 h-10 bg-white/25 rounded-xl flex items-center justify-center text-xl">🛒</div>
+            <img src="/logo.png" alt="Isanthe" className="w-10 h-10 rounded-xl object-contain" />
             <span className="font-extrabold text-2xl tracking-tight">Isanthe</span>
           </div>
           <h2 className="text-4xl font-extrabold leading-snug mb-4">Fresh groceries<br />at your door. 🚀</h2>
@@ -129,7 +129,7 @@ export default function LoginPage() {
       {/* ── Right panel ── */}
       <div className="flex-1 lg:max-w-md flex flex-col items-center justify-center p-8 bg-[#fafaf9]">
         <div className="flex items-center gap-3 mb-10 lg:hidden">
-          <div className="w-10 h-10 bg-grad rounded-xl flex items-center justify-center text-xl shadow-md">🛒</div>
+          <img src="/logo.png" alt="Isanthe" className="w-10 h-10 rounded-xl object-contain shadow-md" />
           <span className="font-extrabold text-2xl">Isanthe</span>
         </div>
 
