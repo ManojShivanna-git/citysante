@@ -14,6 +14,7 @@ const STATUS_TABS = [
   { key: 'pending,confirmed,packed,assigned,picked_up,out_for_delivery', label: 'Active' },
   { key: 'delivered',  label: 'Delivered' },
   { key: 'cancelled',  label: 'Cancelled' },
+  { key: 'pending,confirmed,packed,assigned,picked_up,out_for_delivery,delivered,cancelled', label: 'All' },
 ]
 
 const STATUS_COLOR: Record<string, string> = {

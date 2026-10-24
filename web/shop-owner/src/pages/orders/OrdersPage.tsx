@@ -64,6 +64,7 @@ export default function OrdersPage() {
       active:    'pending,confirmed,packed,assigned,picked_up,out_for_delivery',
       delivered: 'delivered',
       cancelled: 'cancelled',
+      all:       'pending,confirmed,packed,assigned,picked_up,out_for_delivery,delivered,cancelled',
     }
     orderApi.getShopOrders({ status: statusMap[filter] || statusMap.active, page: String(currentPage), limit: String(LIMIT) })
       .then((res) => { setOrders(res.data.data); setTotal(res.data.total ?? 0) })
@@ -218,7 +219,7 @@ export default function OrdersPage() {
 
       {/* Filter tabs */}
       <div className="card p-3 flex flex-wrap gap-2 items-center">
-        {['active', 'delivered', 'cancelled'].map((f) => (
+        {['active', 'delivered', 'cancelled', 'all'].map((f) => (
           <button key={f} onClick={() => setFilter(f)}
             className={clsx('px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors',
               filter === f ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
