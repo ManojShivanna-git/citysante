@@ -140,12 +140,7 @@ export const addRiderToShop = async (req: AuthRequest, res: Response, next: Next
     const { phone } = req.body
 
     // Look up shopId from DB in case it's not in the JWT (shop registered after login)
-    let shopId = req.user?.shopId
-    if (!shopId) {
-      const shopResult = await query(`SELECT id FROM shops WHERE owner_id = $1`, [req.user?.userId])
-      if (shopResult.rows.length === 0) throw createError('Shop not found', 404)
-      shopId = shopResult.rows[0].id
-    }
+    const shopId = req.user?.shopId
 
     const riderResult = await query(
       `SELECT u.id FROM users u

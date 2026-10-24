@@ -118,8 +118,15 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
       [user.id, expectedRole]
     )
 
+    // Look up shopId for shop owners so it's embedded in the JWT
+    let shopId: string | undefined
+    if (expectedRole === 'shop_owner') {
+      const shopResult = await query('SELECT id FROM shops WHERE owner_id = $1 LIMIT 1', [user.id])
+      if (shopResult.rows.length > 0) shopId = shopResult.rows[0].id
+    }
+
     // Issue token with the role context they logged in with
-    const tokens = generateTokens({ userId: user.id, role: expectedRole as UserRole })
+    const tokens = generateTokens({ userId: user.id, role: expectedRole as UserRole, shopId })
 
     res.json({
       success: true,

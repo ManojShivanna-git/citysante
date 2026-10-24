@@ -50,6 +50,14 @@ export const authenticate = async (
       }
     }
 
+    // If shop_owner but shopId missing from JWT (old token), look it up once here
+    if (payload.role === 'shop_owner' && !payload.shopId) {
+      const shopResult = await query('SELECT id FROM shops WHERE owner_id = $1 LIMIT 1', [payload.userId])
+      if (shopResult.rows.length > 0) {
+        payload.shopId = shopResult.rows[0].id
+      }
+    }
+
     req.user = payload
     next()
   } catch {
