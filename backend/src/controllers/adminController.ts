@@ -364,13 +364,17 @@ export const getDashboard = async (_req: Request, res: Response, next: NextFunct
         COUNT(*) FILTER (WHERE status = 'suspended')              AS suspended
         FROM shops`),
 
-      // Users summary
+      // Users summary — count by user_roles table to support multi-role users
       query(`SELECT
-        COUNT(*)                                                  AS total,
-        COUNT(*) FILTER (WHERE role = 'customer')                 AS customers,
-        COUNT(*) FILTER (WHERE role = 'shop_owner')               AS shop_owners,
-        COUNT(*) FILTER (WHERE role = 'rider')                    AS riders
-        FROM users WHERE is_active = TRUE`),
+        COUNT(DISTINCT u.id)                                                         AS total,
+        COUNT(DISTINCT ur_c.user_id)                                                 AS customers,
+        COUNT(DISTINCT ur_s.user_id)                                                 AS shop_owners,
+        COUNT(DISTINCT ur_r.user_id)                                                 AS riders
+        FROM users u
+        LEFT JOIN user_roles ur_c ON ur_c.user_id = u.id AND ur_c.role = 'customer'
+        LEFT JOIN user_roles ur_s ON ur_s.user_id = u.id AND ur_s.role = 'shop_owner'
+        LEFT JOIN user_roles ur_r ON ur_r.user_id = u.id AND ur_r.role = 'rider'
+        WHERE u.is_active = TRUE`),
 
       // Billing summary
       query(`SELECT
