@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import * as Location from 'expo-location'
 import { shopApi } from '../api/api'
 import { useAuthStore } from '../store/authStore'
 
@@ -27,12 +28,36 @@ export default function RegisterShopScreen() {
     delivery_fee: '20', minimum_order: '100',
     delivery_time_min: '20', delivery_time_max: '45',
   })
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [locLoading, setLocLoading] = useState(false)
+
+  const handleGetLocation = async () => {
+    setLocLoading(true)
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert('Permission denied', 'Location permission is required to register your shop.')
+        return
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+      setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude })
+      Alert.alert('Location captured', `Lat: ${loc.coords.latitude.toFixed(5)}, Lng: ${loc.coords.longitude.toFixed(5)}`)
+    } catch {
+      Alert.alert('Error', 'Could not get location. Please try again.')
+    } finally {
+      setLocLoading(false)
+    }
+  }
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }))
 
   const handleSubmit = async () => {
     if (!form.name || !form.phone || !form.address || !form.city) {
       Alert.alert('Missing fields', 'Please fill in all required fields.')
+      return
+    }
+    if (!coords) {
+      Alert.alert('Location required', 'Please tap "Use My Location" to capture your shop\'s GPS location.')
       return
     }
     setSaving(true)
@@ -46,6 +71,8 @@ export default function RegisterShopScreen() {
         city:              form.city.trim(),
         state:             form.state.trim() || 'Karnataka',
         pincode:           form.pincode.trim() || '000000',
+        lat:               coords!.lat,
+        lng:               coords!.lng,
         delivery_fee:      Number(form.delivery_fee) || 20,
         minimum_order:     Number(form.minimum_order) || 100,
         delivery_time_min: Number(form.delivery_time_min) || 20,
@@ -120,6 +147,20 @@ export default function RegisterShopScreen() {
             <Field label="City *" value={form.city} onChangeText={(v) => set('city', v)} placeholder="e.g. Bangalore" />
             <Field label="State" value={form.state} onChangeText={(v) => set('state', v)} placeholder="e.g. Karnataka" />
             <Field label="Pincode" value={form.pincode} onChangeText={(v) => set('pincode', v)} placeholder="6-digit pincode" keyboardType="number-pad" />
+
+            <TouchableOpacity
+              style={[styles.locBtn, coords ? styles.locBtnDone : {}]}
+              onPress={handleGetLocation}
+              disabled={locLoading}
+            >
+              {locLoading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <><Ionicons name={coords ? 'checkmark-circle' : 'location'} size={18} color="#fff" />
+                    <Text style={styles.locBtnText}>
+                      {coords ? '✓ Location captured' : 'Use My Location *'}
+                    </Text></>
+              }
+            </TouchableOpacity>
 
             <Text style={styles.sectionLabel}>Delivery Settings</Text>
             <View style={styles.rowTwo}>
@@ -218,4 +259,7 @@ const styles = StyleSheet.create({
 
   logoutLink:   { alignItems: 'center', marginTop: 28 },
   logoutLinkText:{ fontSize: 13, color: '#9ca3af', textDecorationLine: 'underline' },
+  locBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: ORANGE, borderRadius: 12, paddingVertical: 13, paddingHorizontal: 16, marginBottom: 16 },
+  locBtnDone:   { backgroundColor: '#16a34a' },
+  locBtnText:   { color: '#fff', fontWeight: '700', fontSize: 14 },
 })
