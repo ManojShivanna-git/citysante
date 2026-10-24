@@ -141,7 +141,9 @@ export const addRiderToShop = async (req: AuthRequest, res: Response, next: Next
     const shopId = req.user?.shopId
 
     const riderResult = await query(
-      `SELECT id FROM users WHERE phone = $1 AND role = 'rider' AND is_active = TRUE`,
+      `SELECT u.id FROM users u
+       JOIN user_roles ur ON ur.user_id = u.id AND ur.role = 'rider'
+       WHERE u.phone = $1 AND u.is_active = TRUE`,
       [phone]
     )
     if (riderResult.rows.length === 0) throw createError('Rider not found with this phone number', 404)
