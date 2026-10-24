@@ -416,6 +416,7 @@ export const getShopOrders = async (req: AuthRequest, res: Response, next: NextF
       query(
         `SELECT o.*,
           u.name AS customer_name, u.phone AS customer_phone,
+          r.name AS rider_name, r.phone AS rider_phone, r.profile_photo_url AS rider_photo,
           json_agg(json_build_object(
             'id', oi.id,
             'product_name', oi.product_name,
@@ -427,9 +428,10 @@ export const getShopOrders = async (req: AuthRequest, res: Response, next: NextF
           ) ORDER BY oi.product_name) AS items
          FROM orders o
          JOIN users u ON u.id = o.customer_id
+         LEFT JOIN users r ON r.id = o.rider_id
          JOIN order_items oi ON oi.order_id = o.id
          WHERE ${conditions.join(' AND ')}
-         GROUP BY o.id, u.name, u.phone
+         GROUP BY o.id, u.name, u.phone, r.name, r.phone, r.profile_photo_url
          ORDER BY o.created_at DESC
          LIMIT $${idx++} OFFSET $${idx}`,
         params

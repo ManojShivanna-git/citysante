@@ -389,6 +389,22 @@ export default function OrdersPage() {
                 </div>
               </div>
 
+              {/* Rider */}
+              {(selected as any).rider_name && (
+                <div className="card p-4 space-y-1">
+                  <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">Delivery Boy</div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-600 text-sm shrink-0">
+                      {(selected as any).rider_name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm">{(selected as any).rider_name}</div>
+                      <div className="text-sm text-gray-500">{(selected as any).rider_phone}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Items */}
               <div>
                 <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">
