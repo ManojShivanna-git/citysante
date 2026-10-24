@@ -58,7 +58,7 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
     const { phone, otp, name, expectedRole = 'customer' } = req.body
     if (!phone || !otp) throw createError('Phone and OTP are required', 400)
 
-    const allowedRoles = ['customer', 'shop_owner']
+    const allowedRoles = ['customer', 'shop_owner', 'rider']
     if (!allowedRoles.includes(expectedRole)) {
       throw createError('Invalid role', 400)
     }
