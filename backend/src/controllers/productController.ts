@@ -203,14 +203,20 @@ export const getShopProducts = async (req: Request, res: Response, next: NextFun
   }
 }
 
+// ─── Helper: resolve shopId from JWT or DB ───────────────────────────────
+async function resolveShopId(req: AuthRequest): Promise<string> {
+  if (req.user?.shopId) return req.user.shopId
+  const result = await query(`SELECT id FROM shops WHERE owner_id = $1`, [req.user?.userId])
+  if (result.rows.length === 0) throw createError('No shop associated with this account', 400)
+  return result.rows[0].id
+}
+
 // ─── Shop: Add Product from Catalog ──────────────────────────────────────
 
 export const addShopProduct = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { product_id, price, discount_price, stock_qty, low_stock_alert = 10 } = req.body
-    const shopId = req.user?.shopId
-
-    if (!shopId) throw createError('No shop associated with this account', 400)
+    const shopId = await resolveShopId(req)
 
     // Verify product exists in master catalog
     const product = await query('SELECT id FROM products WHERE id = $1 AND is_active = TRUE', [product_id])
@@ -241,7 +247,7 @@ export const updateStock = async (req: AuthRequest, res: Response, next: NextFun
   try {
     const { id } = req.params
     const { stock_qty, price, discount_price, is_available } = req.body
-    const shopId = req.user?.shopId
+    const shopId = await resolveShopId(req)
 
     const result = await query(
       `UPDATE shop_products SET
@@ -272,8 +278,7 @@ export const updateStock = async (req: AuthRequest, res: Response, next: NextFun
 export const deleteShopProduct = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params
-    const shopId = req.user?.shopId
-    if (!shopId) throw createError('No shop associated with this account', 400)
+    const shopId = await resolveShopId(req)
 
     const inOrders = await query('SELECT COUNT(*) FROM order_items WHERE shop_product_id = $1', [id])
     if (Number(inOrders.rows[0].count) > 0) {
