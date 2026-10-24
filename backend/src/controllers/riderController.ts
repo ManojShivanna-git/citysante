@@ -192,7 +192,9 @@ export const lookupRiderByPhone = async (req: AuthRequest, res: Response, next: 
     if (!phone) throw createError('phone query param is required', 400)
 
     const result = await query(
-      `SELECT id, name, phone FROM users WHERE phone = $1 AND role = 'rider' AND is_active = TRUE`,
+      `SELECT u.id, u.name, u.phone FROM users u
+       JOIN user_roles ur ON ur.user_id = u.id AND ur.role = 'rider'
+       WHERE u.phone = $1 AND u.is_active = TRUE`,
       [phone]
     )
     if (result.rows.length === 0) throw createError('No active rider found with this phone number', 404)
