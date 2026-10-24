@@ -17,15 +17,52 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+let isRefreshing = false
+let failedQueue: Array<{ resolve: (v: string) => void; reject: (e: unknown) => void }> = []
+function processQueue(error: unknown, token: string | null) {
+  failedQueue.forEach((p) => error ? p.reject(error) : p.resolve(token!))
+  failedQueue = []
+}
+
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('cs_token')
-      window.location.href = '/login'
+  async (err) => {
+    const original = err.config
+    if (err.response?.status === 401 && !original._retry) {
+      const refreshToken = localStorage.getItem('cs_refresh')
+      if (!refreshToken) {
+        localStorage.removeItem('cs_token')
+        window.location.href = '/login'
+        return Promise.reject(err)
+      }
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        }).then((token) => { original.headers.Authorization = `Bearer ${token}`; return api(original) })
+      }
+      original._retry = true
+      isRefreshing = true
+      try {
+        const res = await axios.post(`${import.meta.env.VITE_API_URL || '/api'}/auth/refresh-token`, { refreshToken })
+        const { accessToken, refreshToken: newRefresh } = res.data.data
+        localStorage.setItem('cs_token', accessToken)
+        localStorage.setItem('cs_refresh', newRefresh)
+        api.defaults.headers.common.Authorization = `Bearer ${accessToken}`
+        processQueue(null, accessToken)
+        original.headers.Authorization = `Bearer ${accessToken}`
+        return api(original)
+      } catch (refreshErr) {
+        processQueue(refreshErr, null)
+        localStorage.removeItem('cs_token')
+        localStorage.removeItem('cs_refresh')
+        window.location.href = '/login'
+        return Promise.reject(refreshErr)
+      } finally { isRefreshing = false }
     }
-    const msg = err.response?.data?.message
-    if (msg) toast.error(msg)
+    if (!original?.url?.includes('/auth/refresh-token')) {
+      const msg = err.response?.data?.message
+      if (msg) toast.error(msg)
+    }
     return Promise.reject(err)
   }
 )

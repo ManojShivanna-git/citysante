@@ -13,17 +13,52 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Handle 401 globally
+// Handle 401 globally — silent refresh before redirecting to login
+let isRefreshing = false
+let failedQueue: Array<{ resolve: (v: string) => void; reject: (e: unknown) => void }> = []
+function processQueue(error: unknown, token: string | null) {
+  failedQueue.forEach((p) => error ? p.reject(error) : p.resolve(token!))
+  failedQueue = []
+}
+
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      window.location.href = '/login'
+  async (err) => {
+    const original = err.config
+    if (err.response?.status === 401 && !original._retry) {
+      const refreshToken = localStorage.getItem('refreshToken')
+      if (!refreshToken) {
+        localStorage.removeItem('accessToken')
+        window.location.href = '/login'
+        return Promise.reject(err)
+      }
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        }).then((token) => { original.headers.Authorization = `Bearer ${token}`; return api(original) })
+      }
+      original._retry = true
+      isRefreshing = true
+      try {
+        const res = await axios.post(`${import.meta.env.VITE_API_URL || '/api'}/auth/refresh-token`, { refreshToken })
+        const { accessToken, refreshToken: newRefresh } = res.data.data
+        localStorage.setItem('accessToken', accessToken)
+        localStorage.setItem('refreshToken', newRefresh)
+        api.defaults.headers.common.Authorization = `Bearer ${accessToken}`
+        processQueue(null, accessToken)
+        original.headers.Authorization = `Bearer ${accessToken}`
+        return api(original)
+      } catch (refreshErr) {
+        processQueue(refreshErr, null)
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        window.location.href = '/login'
+        return Promise.reject(refreshErr)
+      } finally { isRefreshing = false }
     }
-    const message = err.response?.data?.message || 'Something went wrong'
-    toast.error(message)
+    if (!original?.url?.includes('/auth/refresh-token')) {
+      toast.error(err.response?.data?.message || 'Something went wrong')
+    }
     return Promise.reject(err)
   }
 )

@@ -9,14 +9,76 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// ─── Silent token refresh on 401 ─────────────────────────────────────────────
+// When the access token expires the server returns 401. Before giving up and
+// sending the user to /login, try to silently get a new access token using the
+// refresh token (valid for 7 days). If that also fails, THEN redirect to login.
+// This is the same pattern used by Swiggy, Zomato, Amazon etc.
+
+let isRefreshing = false
+let failedQueue: Array<{ resolve: (v: string) => void; reject: (e: unknown) => void }> = []
+
+function processQueue(error: unknown, token: string | null) {
+  failedQueue.forEach((p) => error ? p.reject(error) : p.resolve(token!))
+  failedQueue = []
+}
+
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('accessToken')
-      window.location.href = '/login'
+  async (err) => {
+    const original = err.config
+
+    // Only attempt refresh for 401s that haven't been retried yet
+    if (err.response?.status === 401 && !original._retry) {
+      const refreshToken = localStorage.getItem('refreshToken')
+
+      // No refresh token → go to login immediately
+      if (!refreshToken) {
+        localStorage.removeItem('accessToken')
+        window.location.href = '/login'
+        return Promise.reject(err)
+      }
+
+      // If a refresh is already in-flight, queue this request until it resolves
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        }).then((token) => {
+          original.headers.Authorization = `Bearer ${token}`
+          return api(original)
+        })
+      }
+
+      original._retry = true
+      isRefreshing = true
+
+      try {
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_URL || '/api'}/auth/refresh-token`,
+          { refreshToken }
+        )
+        const { accessToken, refreshToken: newRefresh } = res.data.data
+        localStorage.setItem('accessToken', accessToken)
+        localStorage.setItem('refreshToken', newRefresh)
+        api.defaults.headers.common.Authorization = `Bearer ${accessToken}`
+        processQueue(null, accessToken)
+        original.headers.Authorization = `Bearer ${accessToken}`
+        return api(original)
+      } catch (refreshErr) {
+        processQueue(refreshErr, null)
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        window.location.href = '/login'
+        return Promise.reject(refreshErr)
+      } finally {
+        isRefreshing = false
+      }
     }
-    toast.error(err.response?.data?.message || 'Something went wrong')
+
+    // Non-401 errors — show toast (skip for refresh-token endpoint itself)
+    if (!original?.url?.includes('/auth/refresh-token')) {
+      toast.error(err.response?.data?.message || 'Something went wrong')
+    }
     return Promise.reject(err)
   }
 )

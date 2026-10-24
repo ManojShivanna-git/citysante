@@ -12,11 +12,11 @@ import { sendOTPEmail } from '../services/emailService'
 
 const generateTokens = (payload: AuthPayload) => {
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET || 'secret', {
-    expiresIn: process.env.JWT_EXPIRES_IN || '15m',
+    expiresIn: process.env.JWT_EXPIRES_IN || '1h',
   } as jwt.SignOptions)
 
   const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET || 'refresh_secret', {
-    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   } as jwt.SignOptions)
 
   return { accessToken, refreshToken }
