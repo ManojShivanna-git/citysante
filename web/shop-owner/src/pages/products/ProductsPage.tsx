@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Search, Plus, Edit2, Trash2, Package, X, Send, ImagePlus, Barcode, Loader2 } from 'lucide-react'
-import { productApi } from '../../services/api'
+import api, { productApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
 import type { ShopProduct, CatalogProduct, Category } from '../../types'
 import toast from 'react-hot-toast'
@@ -48,8 +48,9 @@ export default function ProductsPage() {
       if (!d?.name) { toast.error('Product not found for this barcode'); return }
       setReqForm((f) => ({ ...f, name: d.name, brand: d.brand || f.brand, description: d.description || f.description, image_url: d.image_url || f.image_url, ...(d.unit ? { unit: d.unit } : {}) }))
       toast.success('Product details filled from barcode!')
-    } catch {
-      toast.error('Lookup failed — check your internet connection')
+    } catch (err: any) {
+      console.error('Barcode lookup error:', err?.response?.data || err?.message || err)
+      toast.error(err?.response?.data?.message || 'Lookup failed — check your internet connection')
     } finally {
       setLookingUp(false)
     }
