@@ -104,6 +104,8 @@ export const productApi = {
   // Request new product to admin
   requestNewProduct: (data: { name: string; description?: string; unit: string; brand?: string }) =>
     api.post('/products/requests', data),
+  // Barcode lookup via backend (avoids CORS)
+  barcodeLookup: (barcode: string) => api.get(`/products/barcode-lookup?barcode=${barcode}`),
 }
 
 export const billingApi = {

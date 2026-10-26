@@ -72,46 +72,16 @@ export default function CatalogScreen() {
     if (!code.trim()) return
     setLookingUp(true); setLookupDone(false)
     try {
-      let name = '', brand = '', qty = '', img = '', found = false
-
-      // Try Open Food Facts first
-      try {
-        const res  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code.trim()}.json`)
-        const json = await res.json()
-        if (json.status === 1 && json.product?.product_name) {
-          const p = json.product
-          name  = p.product_name || p.product_name_en || ''
-          brand = p.brands?.split(',')[0]?.trim() || ''
-          qty   = p.quantity || ''
-          img   = p.image_front_url || p.image_url || ''
-          found = true
-        }
-      } catch { /* try next */ }
-
-      // Fallback: UPC Item DB
-      if (!found) {
-        try {
-          const res  = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code.trim()}`)
-          const json = await res.json()
-          if (json.code === 'OK' && json.items?.length > 0) {
-            const item = json.items[0]
-            name  = item.title || ''
-            brand = item.brand || ''
-            img   = item.images?.[0] || ''
-            found = true
-          }
-        } catch { /* both failed */ }
-      }
-
-      if (!found || !name) {
+      const res  = await productApi.barcodeLookup(code.trim())
+      const d    = res.data?.data
+      if (!d?.name) {
         Alert.alert('Not found', 'No product found for this barcode. Fill manually.')
         return
       }
-
-      if (name)  setReqName(name)
-      if (brand) setReqBrand(brand)
-      if (qty)   setReqUnit(qty)
-      if (img)   setReqImage(img)
+      if (d.name)      setReqName(d.name)
+      if (d.brand)     setReqBrand(d.brand)
+      if (d.unit)      setReqUnit(d.unit)
+      if (d.image_url) setReqImage(d.image_url)
       setLookupDone(true)
     } catch {
       Alert.alert('Error', 'Lookup failed. Check your connection.')

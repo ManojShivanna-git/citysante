@@ -38,6 +38,46 @@ router.post  ('/shop',                authenticate, authorize('shop_owner'), add
 router.patch ('/shop/:id/stock',      authenticate, authorize('shop_owner'), updateStock)
 router.delete('/shop/:id',            authenticate, authorize('shop_owner'), deleteShopProduct)
 
+// Barcode lookup — proxy to Open Food Facts + UPC Item DB (avoids browser CORS)
+router.get('/barcode-lookup',       authenticate, async (req, res) => {
+  const code = String(req.query.barcode || '').trim()
+  if (!code) { res.status(400).json({ success: false, message: 'barcode required' }); return }
+  try {
+    // Try Open Food Facts
+    const off = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
+    const offData: any = await off.json()
+    if (offData.status === 1 && offData.product?.product_name) {
+      const p   = offData.product
+      const qty = (p.quantity || '').toLowerCase()
+      const unit = qty.includes('ml') ? 'ml' : qty.includes('litre') ? 'litre' : qty.includes('gram') || qty.includes('g)') ? 'gram' : qty.includes('kg') ? 'kg' : 'piece'
+      const unit_value = qty.match(/[\d.]+/)?.[0] || '1'
+      res.json({ success: true, data: {
+        name:        p.product_name || p.product_name_en || '',
+        brand:       p.brands?.split(',')[0]?.trim() || '',
+        description: p.generic_name || '',
+        image_url:   p.image_front_url || p.image_url || '',
+        unit, unit_value,
+      }}); return
+    }
+    // Fallback: UPC Item DB
+    const upc = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`)
+    const upcData: any = await upc.json()
+    if (upcData.code === 'OK' && upcData.items?.length > 0) {
+      const item = upcData.items[0]
+      res.json({ success: true, data: {
+        name:        item.title || '',
+        brand:       item.brand || '',
+        description: item.description || '',
+        image_url:   item.images?.[0] || '',
+        unit: 'piece', unit_value: '1',
+      }}); return
+    }
+    res.status(404).json({ success: false, message: 'Product not found for this barcode' })
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Barcode lookup failed' })
+  }
+})
+
 // Product requests
 router.post('/request',             authenticate, authorize('shop_owner'), requestProduct)
 

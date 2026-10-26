@@ -34,45 +34,10 @@ export default function ProductsPage() {
     if (!code) { toast.error('Enter a barcode number'); return }
     setLookingUp(true)
     try {
-      // Try Open Food Facts first
-      let name = '', brand = '', description = '', image_url = '', unit = 'piece', unitValue = '1'
-      let found = false
-
-      try {
-        const res  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
-        const data = await res.json()
-        if (data.status === 1 && data.product?.product_name) {
-          const p   = data.product
-          const qty = (p.quantity || '').toLowerCase()
-          unit      = qty.includes('ml') ? 'ml' : qty.includes('litre') ? 'litre' : qty.includes('gram') || qty.includes('g)') ? 'gram' : qty.includes('kg') ? 'kg' : 'piece'
-          unitValue = qty.match(/[\d.]+/)?.[0] || '1'
-          name        = p.product_name || p.product_name_en || ''
-          brand       = p.brands?.split(',')[0]?.trim() || ''
-          description = p.generic_name || ''
-          image_url   = p.image_front_url || p.image_url || ''
-          found = true
-        }
-      } catch { /* try next */ }
-
-      // Fallback: UPC Item DB
-      if (!found) {
-        try {
-          const res  = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`)
-          const data = await res.json()
-          if (data.code === 'OK' && data.items?.length > 0) {
-            const item  = data.items[0]
-            name        = item.title || ''
-            brand       = item.brand || ''
-            description = item.description || ''
-            image_url   = item.images?.[0] || ''
-            found = true
-          }
-        } catch { /* both failed */ }
-      }
-
-      if (!found || !name) { toast.error('Product not found for this barcode'); return }
-
-      setForm((f) => ({ ...f, name, brand, description, image_url, unit, unit_value: unitValue }))
+      const res = await api.get(`/products/barcode-lookup?barcode=${code}`)
+      const { data: d } = res.data
+      if (!d?.name) { toast.error('Product not found for this barcode'); return }
+      setForm((f) => ({ ...f, name: d.name, brand: d.brand || f.brand, description: d.description || f.description, image_url: d.image_url || f.image_url, unit: d.unit || f.unit, unit_value: d.unit_value || f.unit_value }))
       toast.success('Product details filled from barcode!')
     } catch {
       toast.error('Lookup failed — check your internet connection')
