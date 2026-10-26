@@ -45,7 +45,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
 
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Isanthe" className="w-24 h-24 mx-auto mb-4 rounded-3xl object-cover" />
+          <img src="/logo.png" alt="Isanthe" className="w-24 h-24 mx-auto mb-4 rounded-2xl object-contain" />
           <h1 className="text-2xl font-bold text-white">Isanthe Admin</h1>
           <p className="text-gray-400 text-sm mt-1">Sign in to your admin account</p>
         </div>
