@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Plus, Search, Package, Barcode, Loader2 } from 'lucide-react'
-import { productApi } from '../../services/api'
+import api, { productApi } from '../../services/api'
 import type { Category, Product } from '../../types'
 import toast from 'react-hot-toast'
 import SearchableSelect from '../../components/SearchableSelect'
@@ -21,7 +21,7 @@ export default function ProductsPage() {
   const [showAddCat, setShowAddCat]         = useState(false)
 
   // Form state
-  const [form, setForm] = useState({ category_id: '', name: '', description: '', unit: 'kg', unit_value: '1', brand: '', image_url: '' })
+  const [form, setForm] = useState({ category_id: '', name: '', description: '', unit: 'kg', unit_value: '1', brand: '', image_url: '', barcode: '' })
   const [catForm, setCatForm] = useState({ name: '', sort_order: '0', image_url: '' })
   const [uploadingProductImg, setUploadingProductImg] = useState(false)
   const [uploadingCatImg, setUploadingCatImg]         = useState(false)
@@ -37,7 +37,7 @@ export default function ProductsPage() {
       const res = await api.get(`/products/barcode-lookup?barcode=${code}`)
       const { data: d } = res.data
       if (!d?.name) { toast.error('Product not found for this barcode'); return }
-      setForm((f) => ({ ...f, name: d.name, brand: d.brand || f.brand, description: d.description || f.description, image_url: d.image_url || f.image_url, unit: d.unit || f.unit, unit_value: d.unit_value || f.unit_value }))
+      setForm((f) => ({ ...f, name: d.name, brand: d.brand || f.brand, description: d.description || f.description, image_url: d.image_url || f.image_url, unit: d.unit || f.unit, unit_value: d.unit_value || f.unit_value, barcode: barcode.trim() }))
       toast.success('Product details filled from barcode!')
     } catch {
       toast.error('Lookup failed — check your internet connection')
@@ -89,7 +89,7 @@ export default function ProductsPage() {
       await productApi.createProduct(form)
       toast.success('Product added to catalog')
       setShowAddProduct(false)
-      setForm({ category_id: '', name: '', description: '', unit: 'kg', unit_value: '1', brand: '', image_url: '' })
+      setForm({ category_id: '', name: '', description: '', unit: 'kg', unit_value: '1', brand: '', image_url: '', barcode: '' })
       setBarcode('')
       loadAll()
     } catch {}
@@ -358,6 +358,8 @@ export default function ProductsPage() {
               </div>
               <input className="input" placeholder="Brand (optional)" value={form.brand}
                 onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+              <input className="input" placeholder="Barcode (optional)" value={form.barcode}
+                onChange={(e) => setForm({ ...form, barcode: e.target.value.replace(/\D/g, '') })} />
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowAddProduct(false)} className="btn-secondary flex-1">Cancel</button>
                 <button type="submit" className="btn-primary flex-1">Add Product</button>

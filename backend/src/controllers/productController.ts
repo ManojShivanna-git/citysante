@@ -99,11 +99,11 @@ export const uploadProductImage = async (req: AuthRequest, res: Response, next: 
 
 export const createProduct = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { category_id, name, description, image_url, unit, unit_value, brand } = req.body
+    const { category_id, name, description, image_url, unit, unit_value, brand, barcode } = req.body
     const result = await query(
-      `INSERT INTO products (category_id, name, description, image_url, unit, unit_value, brand, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [category_id, name, description, image_url, unit, unit_value, brand, req.user?.userId]
+      `INSERT INTO products (category_id, name, description, image_url, unit, unit_value, brand, barcode, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [category_id, name, description, image_url, unit, unit_value, brand, barcode || null, req.user?.userId]
     )
     res.status(201).json({ success: true, message: 'Product created', data: result.rows[0] })
   } catch (err) {
@@ -371,14 +371,14 @@ export const searchProducts = async (req: Request, res: Response, next: NextFunc
 
 export const requestProduct = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { name, description, image_url, unit, brand } = req.body
+    const { name, description, image_url, unit, brand, barcode } = req.body
     const shopId = req.user?.shopId
     if (!shopId) throw createError('No shop associated with this account', 400)
 
     const result = await query(
-      `INSERT INTO product_requests (shop_id, requested_by, name, description, image_url, unit, brand)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [shopId, req.user?.userId, name, description, image_url, unit, brand]
+      `INSERT INTO product_requests (shop_id, requested_by, name, description, image_url, unit, brand, barcode)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [shopId, req.user?.userId, name, description, image_url, unit, brand, barcode || null]
     )
     res.status(201).json({ success: true, message: 'Product request submitted to admin', data: result.rows[0] })
   } catch (err) {

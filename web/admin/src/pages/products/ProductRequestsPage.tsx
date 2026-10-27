@@ -107,6 +107,7 @@ export default function ProductRequestsPage() {
               <div className="flex gap-4 text-xs text-gray-500">
                 {r.unit && <span>Unit: {r.unit}</span>}
                 {r.brand && <span>Brand: {r.brand}</span>}
+                {r.barcode && <span>Barcode: {r.barcode}</span>}
               </div>
               <div className="text-xs text-gray-400">
                 {new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}

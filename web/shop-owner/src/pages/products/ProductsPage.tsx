@@ -26,8 +26,8 @@ export default function ProductsPage() {
   const [selectedCatalog, setSelectedCatalog]   = useState<CatalogProduct | null>(null)
 
   // ── Request New Product tab state ───────────────────────────────────────
-  type ReqItem = { _id: string; name: string; description: string; unit: string; brand: string; image_url: string }
-  const BLANK_REQ = { name: '', description: '', unit: 'kg', brand: '', image_url: '' }
+  type ReqItem = { _id: string; name: string; description: string; unit: string; brand: string; image_url: string; barcode: string }
+  const BLANK_REQ = { name: '', description: '', unit: 'kg', brand: '', image_url: '', barcode: '' }
   const [reqList, setReqList]           = useState<ReqItem[]>([])
   const [reqForm, setReqForm]           = useState(BLANK_REQ)
   const [reqEditing, setReqEditing]     = useState<string | null>(null)  // _id of row being edited inline
@@ -46,7 +46,7 @@ export default function ProductsPage() {
       const res  = await api.get(`/products/barcode-lookup?barcode=${code}`)
       const { data: d } = res.data
       if (!d?.name) { toast.error('Product not found for this barcode'); return }
-      setReqForm((f) => ({ ...f, name: d.name, brand: d.brand || f.brand, description: d.description || f.description, image_url: d.image_url || f.image_url, ...(d.unit ? { unit: d.unit } : {}) }))
+      setReqForm((f) => ({ ...f, name: d.name, brand: d.brand || f.brand, description: d.description || f.description, image_url: d.image_url || f.image_url, barcode: barcode.trim(), ...(d.unit ? { unit: d.unit } : {}) }))
       toast.success('Product details filled from barcode!')
     } catch (err: any) {
       console.error('Barcode lookup error:', err?.response?.data || err?.message || err)
@@ -599,6 +599,13 @@ export default function ProductsPage() {
                 </div>
               </div>
 
+              {/* Barcode */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Barcode</label>
+                <input className="input" placeholder="Barcode number (optional)" value={reqForm.barcode}
+                  onChange={(e) => setReqForm((f) => ({ ...f, barcode: e.target.value.replace(/\D/g, '') }))} />
+              </div>
+
               {/* Description */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
@@ -693,7 +700,7 @@ export default function ProductsPage() {
                           <button
                             onClick={() => {
                               setReqEditing(item._id)
-                              setReqForm({ name: item.name, description: item.description, unit: item.unit, brand: item.brand, image_url: item.image_url })
+                              setReqForm({ name: item.name, description: item.description, unit: item.unit, brand: item.brand, image_url: item.image_url, barcode: item.barcode || '' })
                               window.scrollTo({ top: 0, behavior: 'smooth' })
                             }}
                             className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg"
