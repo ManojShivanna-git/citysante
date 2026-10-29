@@ -48,8 +48,10 @@ export const getMasterProducts = async (req: Request, res: Response, next: NextF
       params.push(category_id)
     }
     if (search) {
-      conditions.push(`p.name ILIKE $${paramIdx++}`)
-      params.push(`%${search}%`)
+      // Search by name OR barcode (exact barcode match has priority via OR)
+      conditions.push(`(p.name ILIKE $${paramIdx} OR p.barcode = $${paramIdx + 1})`)
+      params.push(`%${search}%`, search)
+      paramIdx += 2
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''

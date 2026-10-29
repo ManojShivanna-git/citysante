@@ -1,19 +1,25 @@
 import { useCallback, useState } from 'react'
 import {
   View, Text, FlatList, StyleSheet, ActivityIndicator,
-  RefreshControl, TouchableOpacity, Modal, TextInput, Alert,
+  RefreshControl, TouchableOpacity, Modal, TextInput, Alert, Linking,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { riderApi } from '../api/api'
 import type { Rider } from '../types'
 
 const ORANGE = '#f97316'
 
-export default function RidersScreen() {
+export default function RidersScreen({ navigation }: any) {
+  const { top } = useSafeAreaInsets()
   const [riders, setRiders]         = useState<Rider[]>([])
   const [loading, setLoading]       = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+
+  // Rider detail sheet
+  const [selectedRider, setSelectedRider] = useState<Rider | null>(null)
+  const [removing, setRemoving]           = useState(false)
 
   // Add-rider modal state
   const [showModal, setShowModal]   = useState(false)
@@ -66,11 +72,38 @@ export default function RidersScreen() {
     }
   }
 
+  const handleRemoveRider = (rider: Rider) => {
+    Alert.alert(
+      'Remove Rider',
+      `Remove ${rider.name} from your shop? They will no longer receive orders.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove', style: 'destructive',
+          onPress: async () => {
+            setRemoving(true)
+            try {
+              await riderApi.removeRider(rider.id)
+              setSelectedRider(null)
+              load()
+            } catch (e: any) {
+              Alert.alert('Error', e?.response?.data?.message || 'Could not remove rider')
+            } finally { setRemoving(false) }
+          },
+        },
+      ]
+    )
+  }
+
   const onDuty  = riders.filter((r) => r.is_on_duty)
   const offDuty = riders.filter((r) => !r.is_on_duty)
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+      {/* Screen header */}
+      <View style={[styles.screenHeader, { paddingTop: top + 8 }]}>
+        <Text style={styles.screenTitle}>Riders</Text>
+      </View>
       {loading ? (
         <ActivityIndicator color={ORANGE} style={{ marginTop: 40 }} />
       ) : (
@@ -106,7 +139,7 @@ export default function RidersScreen() {
             </View>
           }
           renderItem={({ item: rider }) => (
-            <View style={styles.card}>
+            <TouchableOpacity style={styles.card} onPress={() => setSelectedRider(rider)} activeOpacity={0.7}>
               <View style={[styles.avatar, { backgroundColor: rider.is_on_duty ? '#fff7ed' : '#f3f4f6' }]}>
                 <Text style={[styles.avatarText, { color: rider.is_on_duty ? ORANGE : '#9ca3af' }]}>
                   {rider.name.charAt(0).toUpperCase()}
@@ -121,7 +154,8 @@ export default function RidersScreen() {
                   {rider.is_on_duty ? '● On Duty' : '○ Off Duty'}
                 </Text>
               </View>
-            </View>
+              <Ionicons name="chevron-forward" size={16} color="#d1d5db" style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
           )}
         />
       )}
@@ -131,6 +165,72 @@ export default function RidersScreen() {
         <Ionicons name="add" size={26} color="#fff" />
         <Text style={styles.fabText}>Add Rider</Text>
       </TouchableOpacity>
+
+      {/* Rider Detail Sheet */}
+      <Modal visible={!!selectedRider} animationType="slide" transparent onRequestClose={() => setSelectedRider(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            {selectedRider && (
+              <>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Rider Details</Text>
+                  <TouchableOpacity onPress={() => setSelectedRider(null)}>
+                    <Ionicons name="close" size={22} color="#6b7280" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Avatar + name */}
+                <View style={styles.detailHero}>
+                  <View style={[styles.detailAvatar, { backgroundColor: selectedRider.is_on_duty ? '#fff7ed' : '#f3f4f6' }]}>
+                    <Text style={[styles.detailAvatarText, { color: selectedRider.is_on_duty ? ORANGE : '#9ca3af' }]}>
+                      {selectedRider.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.detailName}>{selectedRider.name}</Text>
+                  <View style={[styles.dutyBadge, { backgroundColor: selectedRider.is_on_duty ? '#dcfce7' : '#f3f4f6' }]}>
+                    <Text style={[styles.dutyText, { color: selectedRider.is_on_duty ? '#16a34a' : '#9ca3af', fontSize: 13 }]}>
+                      {selectedRider.is_on_duty ? '● On Duty' : '○ Off Duty'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Info rows */}
+                <View style={styles.infoRow}>
+                  <Ionicons name="call-outline" size={18} color="#6b7280" />
+                  <Text style={styles.infoText}>{selectedRider.phone}</Text>
+                  <TouchableOpacity onPress={() => Linking.openURL(`tel:${selectedRider.phone}`)} style={styles.callBtn}>
+                    <Text style={styles.callBtnText}>Call</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.infoRow}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#6b7280" />
+                  <Text style={styles.infoText}>
+                    Status: <Text style={{ color: selectedRider.is_active ? '#16a34a' : '#ef4444', fontWeight: '700' }}>
+                      {selectedRider.is_active ? 'Active' : 'Inactive'}
+                    </Text>
+                  </Text>
+                </View>
+
+                {/* Actions */}
+                <TouchableOpacity
+                  style={styles.removeBtn}
+                  onPress={() => handleRemoveRider(selectedRider)}
+                  disabled={removing}
+                >
+                  {removing
+                    ? <ActivityIndicator color="#ef4444" size="small" />
+                    : <>
+                        <Ionicons name="person-remove-outline" size={18} color="#ef4444" />
+                        <Text style={styles.removeBtnText}>Remove from Shop</Text>
+                      </>
+                  }
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Add Rider Modal */}
       <Modal visible={showModal} animationType="slide" transparent onRequestClose={resetModal}>
@@ -205,6 +305,8 @@ export default function RidersScreen() {
 }
 
 const styles = StyleSheet.create({
+  screenHeader: { backgroundColor: '#fff', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  screenTitle:  { fontSize: 22, fontWeight: '800', color: '#111' },
   summary:      { flexDirection: 'row', gap: 10, marginBottom: 16 },
   summaryCard:  { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#f3f4f6' },
   summaryNum:   { fontSize: 24, fontWeight: '800', color: '#111' },
@@ -228,9 +330,22 @@ const styles = StyleSheet.create({
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalBox:     { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  modalHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  modalHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle:   { fontSize: 17, fontWeight: '800', color: '#111' },
   modalHint:    { fontSize: 13, color: '#6b7280', marginBottom: 16, lineHeight: 18 },
+
+  detailHero:       { alignItems: 'center', marginBottom: 20, gap: 8 },
+  detailAvatar:     { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  detailAvatarText: { fontSize: 32, fontWeight: '800' },
+  detailName:       { fontSize: 20, fontWeight: '800', color: '#111' },
+
+  infoRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  infoText:  { flex: 1, fontSize: 14, color: '#374151' },
+  callBtn:   { backgroundColor: '#f0fdf4', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
+  callBtnText:{ fontSize: 13, fontWeight: '700', color: '#16a34a' },
+
+  removeBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: '#fecaca', backgroundColor: '#fef2f2' },
+  removeBtnText: { fontSize: 15, fontWeight: '700', color: '#ef4444' },
 
   searchRow:   { flexDirection: 'row', gap: 10, marginBottom: 16 },
   phoneInput:  { flex: 1, backgroundColor: '#f9fafb', borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, padding: 13, fontSize: 15, color: '#111' },

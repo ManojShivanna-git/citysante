@@ -4,9 +4,9 @@ import {
   StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import * as Location from 'expo-location'
 import { shopApi } from '../api/api'
 import { useAuthStore } from '../store/authStore'
+import InlineMapPicker from '../components/InlineMapPicker'
 
 const ORANGE = '#f97316'
 
@@ -18,41 +18,22 @@ const CATEGORIES = [
 ]
 
 export default function RegisterShopScreen() {
-  const { setShop, logout } = useAuthStore()
+  const { setShop, logout, user } = useAuthStore()
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
 
   const [form, setForm] = useState({
-    name: '', description: '', phone: '', zone_category: 'grocery',
+    name: '', description: '', zone_category: 'grocery',
     address: '', city: '', state: '', pincode: '',
     delivery_fee: '20', minimum_order: '100',
     delivery_time_min: '20', delivery_time_max: '45',
   })
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
-  const [locLoading, setLocLoading] = useState(false)
-
-  const handleGetLocation = async () => {
-    setLocLoading(true)
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync()
-      if (status !== 'granted') {
-        Alert.alert('Permission denied', 'Location permission is required to register your shop.')
-        return
-      }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
-      setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude })
-      Alert.alert('Location captured', `Lat: ${loc.coords.latitude.toFixed(5)}, Lng: ${loc.coords.longitude.toFixed(5)}`)
-    } catch {
-      Alert.alert('Error', 'Could not get location. Please try again.')
-    } finally {
-      setLocLoading(false)
-    }
-  }
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }))
 
   const handleSubmit = async () => {
-    if (!form.name || !form.phone || !form.address || !form.city) {
+    if (!form.name || !form.address || !form.city) {
       Alert.alert('Missing fields', 'Please fill in all required fields.')
       return
     }
@@ -65,7 +46,7 @@ export default function RegisterShopScreen() {
       const res = await shopApi.registerShop({
         name:              form.name.trim(),
         description:       form.description.trim() || undefined,
-        phone:             form.phone.trim(),
+        phone:             user?.phone || '',
         zone_category:     form.zone_category,
         address:           form.address.trim(),
         city:              form.city.trim(),
@@ -115,7 +96,6 @@ export default function RegisterShopScreen() {
         {step === 1 ? (
           <View style={styles.form}>
             <Field label="Shop Name *" value={form.name} onChangeText={(v) => set('name', v)} placeholder="e.g. Sharma Kirana Store" />
-            <Field label="Phone Number *" value={form.phone} onChangeText={(v) => set('phone', v)} placeholder="10-digit mobile number" keyboardType="phone-pad" />
             <Field label="Description" value={form.description} onChangeText={(v) => set('description', v)} placeholder="Brief description of your shop" multiline />
 
             <Text style={styles.label}>Shop Type *</Text>
@@ -134,9 +114,9 @@ export default function RegisterShopScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.nextBtn, !form.name || !form.phone ? { opacity: 0.4 } : {}]}
+              style={[styles.nextBtn, !form.name ? { opacity: 0.4 } : {}]}
               onPress={() => setStep(2)}
-              disabled={!form.name || !form.phone}
+              disabled={!form.name}
             >
               <Text style={styles.nextBtnText}>Next →</Text>
             </TouchableOpacity>
@@ -148,19 +128,15 @@ export default function RegisterShopScreen() {
             <Field label="State" value={form.state} onChangeText={(v) => set('state', v)} placeholder="e.g. Karnataka" />
             <Field label="Pincode" value={form.pincode} onChangeText={(v) => set('pincode', v)} placeholder="6-digit pincode" keyboardType="number-pad" />
 
-            <TouchableOpacity
-              style={[styles.locBtn, coords ? styles.locBtnDone : {}]}
-              onPress={handleGetLocation}
-              disabled={locLoading}
-            >
-              {locLoading
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <><Ionicons name={coords ? 'checkmark-circle' : 'location'} size={18} color="#fff" />
-                    <Text style={styles.locBtnText}>
-                      {coords ? '✓ Location captured' : 'Use My Location *'}
-                    </Text></>
-              }
-            </TouchableOpacity>
+            <Text style={styles.label}>📍 Shop Location *</Text>
+            <InlineMapPicker
+              onLocationSelect={(lat, lng) => setCoords({ lat, lng })}
+              initialLat={coords?.lat}
+              initialLng={coords?.lng}
+            />
+            {coords && (
+              <Text style={styles.coordText}>✓ Location pinned: {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}</Text>
+            )}
 
             <Text style={styles.sectionLabel}>Delivery Settings</Text>
             <View style={styles.rowTwo}>
@@ -259,7 +235,5 @@ const styles = StyleSheet.create({
 
   logoutLink:   { alignItems: 'center', marginTop: 28 },
   logoutLinkText:{ fontSize: 13, color: '#9ca3af', textDecorationLine: 'underline' },
-  locBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: ORANGE, borderRadius: 12, paddingVertical: 13, paddingHorizontal: 16, marginBottom: 16 },
-  locBtnDone:   { backgroundColor: '#16a34a' },
-  locBtnText:   { color: '#fff', fontWeight: '700', fontSize: 14 },
+  coordText:    { fontSize: 11, color: '#16a34a', fontWeight: '600', marginTop: -8, marginBottom: 12 },
 })

@@ -1,4 +1,4 @@
-import { useCallback, useState, useLayoutEffect } from 'react'
+import { useCallback, useState } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, TextInput, Alert, Switch, Image,
@@ -6,7 +6,9 @@ import {
 } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { CameraView, useCameraPermissions } from 'expo-camera'
 import { productApi, getImageUrl } from '../api/api'
 import { useAuthStore } from '../store/authStore'
 import type { ShopProduct } from '../types'
@@ -23,30 +25,18 @@ interface StockModal {
 export default function ProductsScreen() {
   const { shop } = useAuthStore()
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
+  const { top } = useSafeAreaInsets()
 
   const [products, setProducts] = useState<ShopProduct[]>([])
   const [search, setSearch]     = useState('')
   const [loading, setLoading]   = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [camPermission, requestCamPermission] = useCameraPermissions()
 
   // Cross-platform stock edit modal (replaces iOS-only Alert.prompt)
   const [stockModal, setStockModal] = useState<StockModal>({ visible: false, product: null, value: '' })
   const [stockSaving, setStockSaving] = useState(false)
-
-  // Header "+" button → Catalog
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Catalog')}
-          style={styles.headerBtn}
-          hitSlop={8}
-        >
-          <Ionicons name="add-circle-outline" size={26} color={ORANGE} />
-        </TouchableOpacity>
-      ),
-    })
-  }, [navigation])
 
   const load = async () => {
     if (!shop?.id) return
@@ -110,15 +100,38 @@ export default function ProductsScreen() {
     )
   }
 
+  const openScanner = async () => {
+    if (!camPermission?.granted) {
+      const result = await requestCamPermission()
+      if (!result.granted) { Alert.alert('Permission needed', 'Camera access is required to scan barcodes.'); return }
+    }
+    setScannerOpen(true)
+  }
+
+  const handleBarcodeScan = ({ data }: { data: string }) => {
+    setScannerOpen(false)
+    setSearch(data)
+  }
+
   const filtered = products.filter((p) =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.category_name?.toLowerCase().includes(search.toLowerCase())
+    !search ||
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.category_name?.toLowerCase().includes(search.toLowerCase()) ||
+    (p as any).barcode === search
   )
 
   const outOfStock = filtered.filter((p) => p.stock_qty === 0).length
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+      {/* Screen header */}
+      <View style={[styles.screenHeader, { paddingTop: top + 8 }]}>
+        <Text style={styles.screenTitle}>Products</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Catalog')} style={styles.addBtn}>
+          <Ionicons name="add" size={18} color="#fff" />
+          <Text style={styles.addBtnText}>Add</Text>
+        </TouchableOpacity>
+      </View>
       {/* Search */}
       <View style={styles.searchWrap}>
         <Ionicons name="search-outline" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
@@ -126,12 +139,16 @@ export default function ProductsScreen() {
           style={styles.searchInput}
           value={search}
           onChangeText={setSearch}
-          placeholder="Search products..."
+          placeholder="Search by name or barcode..."
           placeholderTextColor="#9ca3af"
         />
-        {search.length > 0 && (
+        {search.length > 0 ? (
           <TouchableOpacity onPress={() => setSearch('')}>
             <Ionicons name="close-circle" size={16} color="#9ca3af" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={openScanner} style={{ paddingLeft: 6 }}>
+            <Ionicons name="barcode-outline" size={20} color={ORANGE} />
           </TouchableOpacity>
         )}
       </View>
@@ -264,12 +281,39 @@ export default function ProductsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Barcode Scanner */}
+      <Modal visible={scannerOpen} animationType="slide" onRequestClose={() => setScannerOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <CameraView
+            style={{ flex: 1 }}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr'] }}
+            onBarcodeScanned={handleBarcodeScan}
+          />
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 50, right: 20, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, padding: 10 }}
+            onPress={() => setScannerOpen(false)}
+          >
+            <Ionicons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+          <View style={{ position: 'absolute', bottom: 60, left: 0, right: 0, alignItems: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 14, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}>
+              Point at a product barcode
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   headerBtn:         { marginRight: 4 },
+  screenHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  screenTitle:       { fontSize: 22, fontWeight: '800', color: '#111' },
+  addBtn:            { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: ORANGE, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  addBtnText:        { color: '#fff', fontWeight: '700', fontSize: 13 },
   searchWrap:        { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', margin: 16, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb' },
   searchInput:       { flex: 1, fontSize: 14, color: '#111' },
   summaryBar:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 4 },

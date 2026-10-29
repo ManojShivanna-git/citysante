@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { CameraView, useCameraPermissions } from 'expo-camera'
+import * as ImagePicker from 'expo-image-picker'
 import { productApi, getImageUrl } from '../api/api'
 import { useAuthStore } from '../store/authStore'
 
@@ -53,19 +54,51 @@ export default function CatalogScreen() {
   const [reqName, setReqName]           = useState('')
   const [reqUnit, setReqUnit]           = useState('')
   const [reqBrand, setReqBrand]         = useState('')
-  const [reqImage, setReqImage]         = useState('')
+  const [reqDesc, setReqDesc]           = useState('')
+  const [reqImage, setReqImage]         = useState('')       // final Cloudinary URL
+  const [reqLocalUri, setReqLocalUri]   = useState('')       // local picked URI for preview
+  const [reqUploading, setReqUploading] = useState(false)    // uploading to Cloudinary
   const [reqSaving, setReqSaving]       = useState(false)
 
-  // Barcode scanner
-  const [scannerOpen, setScannerOpen]   = useState(false)
-  const [barcodeInput, setBarcodeInput] = useState('')
-  const [lookingUp, setLookingUp]       = useState(false)
-  const [lookupDone, setLookupDone]     = useState(false)
+  // Barcode scanner — shared between catalog search and request modal
+  const [scannerOpen, setScannerOpen]       = useState(false)
+  const [scannerTarget, setScannerTarget]   = useState<'catalog' | 'request'>('catalog')
+  const [barcodeInput, setBarcodeInput]     = useState('')
+  const [lookingUp, setLookingUp]           = useState(false)
+  const [lookupDone, setLookupDone]         = useState(false)
 
   const resetReqModal = () => {
     setReqModal(false)
-    setReqName(''); setReqUnit(''); setReqBrand(''); setReqImage('')
+    setReqName(''); setReqUnit(''); setReqBrand(''); setReqDesc('')
+    setReqImage(''); setReqLocalUri('')
     setBarcodeInput(''); setLookupDone(false)
+  }
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow access to your photo library to upload an image.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+    if (result.canceled) return
+    const uri = result.assets[0].uri
+    setReqLocalUri(uri)
+    setReqUploading(true)
+    try {
+      const res = await productApi.uploadImage(uri)
+      setReqImage(res.data.data.image_url)
+    } catch {
+      Alert.alert('Upload failed', 'Could not upload image. Try again.')
+      setReqLocalUri('')
+    } finally {
+      setReqUploading(false)
+    }
   }
 
   const lookupBarcode = async (code: string) => {
@@ -90,18 +123,25 @@ export default function CatalogScreen() {
     }
   }
 
-  const openScanner = async () => {
+  const openScanner = async (target: 'catalog' | 'request' = 'catalog') => {
     if (!camPermission?.granted) {
       const result = await requestCamPermission()
       if (!result.granted) { Alert.alert('Permission needed', 'Camera access is required to scan barcodes.'); return }
     }
+    setScannerTarget(target)
     setScannerOpen(true)
   }
 
   const handleBarcodeScan = ({ data }: { data: string }) => {
     setScannerOpen(false)
-    setBarcodeInput(data)
-    lookupBarcode(data)
+    if (scannerTarget === 'catalog') {
+      // Search catalog by barcode
+      handleSearch(data)
+    } else {
+      // Fill request modal
+      setBarcodeInput(data)
+      lookupBarcode(data)
+    }
   }
 
   // Add product modal
@@ -188,9 +228,12 @@ export default function CatalogScreen() {
     setReqSaving(true)
     try {
       await productApi.requestNewProduct({
-        name: reqName.trim(), unit: reqUnit.trim(),
-        brand: reqBrand.trim() || undefined,
-        image_url: reqImage.trim() || undefined,
+        name:        reqName.trim(),
+        unit:        reqUnit.trim(),
+        brand:       reqBrand.trim()     || undefined,
+        description: reqDesc.trim()      || undefined,
+        barcode:     barcodeInput.trim() || undefined,
+        image_url:   reqImage.trim()     || undefined,
       })
       resetReqModal()
       Alert.alert('Requested!', 'Admin will review and add the product to the catalog.')
@@ -205,7 +248,7 @@ export default function CatalogScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
-      {/* Search bar + request button */}
+      {/* Search bar + scan + request button */}
       <View style={styles.topRow}>
         <View style={styles.searchWrap}>
           <Ionicons name="search-outline" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
@@ -213,12 +256,18 @@ export default function CatalogScreen() {
             style={styles.searchInput}
             value={search}
             onChangeText={handleSearch}
-            placeholder="Search master catalog..."
+            placeholder="Search by name or barcode..."
             placeholderTextColor="#9ca3af"
+            keyboardType="default"
+            returnKeyType="search"
           />
-          {search.length > 0 && (
+          {search.length > 0 ? (
             <TouchableOpacity onPress={() => handleSearch('')}>
               <Ionicons name="close-circle" size={16} color="#9ca3af" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => openScanner('catalog')} style={{ paddingLeft: 6 }}>
+              <Ionicons name="barcode-outline" size={20} color={ORANGE} />
             </TouchableOpacity>
           )}
         </View>
@@ -391,7 +440,7 @@ export default function CatalogScreen() {
 
               {/* ── Barcode row ── */}
               <View style={styles.barcodeRow}>
-                <TouchableOpacity style={styles.scanBtn} onPress={openScanner}>
+                <TouchableOpacity style={styles.scanBtn} onPress={() => openScanner('request')}>
                   <Ionicons name="barcode-outline" size={20} color="#fff" />
                   <Text style={styles.scanBtnText}>Scan</Text>
                 </TouchableOpacity>
@@ -448,6 +497,30 @@ export default function CatalogScreen() {
                   placeholderTextColor="#9ca3af"
                 />
               </View>
+              {/* Image picker */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Product Image — optional</Text>
+                <TouchableOpacity style={styles.imagePicker} onPress={pickImage} disabled={reqUploading}>
+                  {reqUploading ? (
+                    <View style={styles.imagePickerInner}>
+                      <ActivityIndicator color={ORANGE} />
+                      <Text style={styles.imagePickerText}>Uploading...</Text>
+                    </View>
+                  ) : reqLocalUri ? (
+                    <View style={styles.imagePickerInner}>
+                      <Image source={{ uri: reqLocalUri }} style={styles.imageThumb} />
+                      <Text style={[styles.imagePickerText, { color: GREEN }]}>✓ Image uploaded</Text>
+                      <Text style={styles.imagePickerHint}>Tap to change</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.imagePickerInner}>
+                      <Ionicons name="image-outline" size={32} color="#9ca3af" />
+                      <Text style={styles.imagePickerText}>Tap to pick from gallery</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Brand — optional</Text>
                 <TextInput
@@ -458,15 +531,26 @@ export default function CatalogScreen() {
                   placeholderTextColor="#9ca3af"
                 />
               </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Description — optional</Text>
+                <TextInput
+                  style={[styles.formInput, { minHeight: 72, textAlignVertical: 'top' }]}
+                  value={reqDesc}
+                  onChangeText={setReqDesc}
+                  placeholder="e.g. Full-fat butter, salted, 100g pack"
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                />
+              </View>
 
               <View style={styles.modalBtns}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={resetReqModal}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.saveBtn, reqSaving && { opacity: 0.7 }]}
+                  style={[styles.saveBtn, (reqSaving || reqUploading) && { opacity: 0.7 }]}
                   onPress={handleRequestNew}
-                  disabled={reqSaving}
+                  disabled={reqSaving || reqUploading}
                 >
                   {reqSaving
                     ? <ActivityIndicator color="#fff" size="small" />
@@ -515,6 +599,11 @@ const styles = StyleSheet.create({
   formGroup:     { marginBottom: 14 },
   formLabel:     { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
   formInput:     { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111' },
+  imagePicker:      { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, borderStyle: 'dashed', padding: 16, alignItems: 'center', backgroundColor: '#f9fafb' },
+  imagePickerInner: { alignItems: 'center', gap: 6 },
+  imagePickerText:  { fontSize: 13, color: '#6b7280', fontWeight: '600' },
+  imagePickerHint:  { fontSize: 11, color: '#9ca3af' },
+  imageThumb:       { width: 72, height: 72, borderRadius: 10, marginBottom: 4 },
   modalBtns:     { flexDirection: 'row', gap: 12, marginTop: 8 },
   cancelBtn:     { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: '#e5e7eb', alignItems: 'center' },
   cancelBtnText: { fontWeight: '600', color: '#6b7280', fontSize: 14 },

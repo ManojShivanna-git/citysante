@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, RefreshControl, TextInput,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { orderApi } from '../api/api'
 import type { Order } from '../types'
@@ -23,9 +24,11 @@ const STATUS_COLOR: Record<string, string> = {
   delivered: '#22c55e', cancelled: '#ef4444',
 }
 
-export default function OrdersScreen({ navigation }: any) {
+export default function OrdersScreen({ navigation, route }: any) {
+  const { top } = useSafeAreaInsets()
+  const initialTab = route?.params?.initialTab || STATUS_TABS[0].key
   const [orders, setOrders]     = useState<Order[]>([])
-  const [tab, setTab]           = useState(STATUS_TABS[0].key)
+  const [tab, setTab]           = useState(initialTab)
   const [search, setSearch]     = useState('')
   const [loading, setLoading]   = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -48,6 +51,10 @@ export default function OrdersScreen({ navigation }: any) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+      {/* Screen header */}
+      <View style={[styles.screenHeader, { paddingTop: top + 8 }]}>
+        <Text style={styles.screenTitle}>Orders</Text>
+      </View>
       {/* Tabs */}
       <View style={styles.tabBar}>
         {STATUS_TABS.map((t) => (
@@ -124,6 +131,8 @@ export default function OrdersScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  screenHeader: { backgroundColor: '#fff', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  screenTitle:  { fontSize: 22, fontWeight: '800', color: '#111' },
   tabBar:       { flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, gap: 8, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   tab:          { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: '#f3f4f6' },
   tabActive:    { backgroundColor: ORANGE },

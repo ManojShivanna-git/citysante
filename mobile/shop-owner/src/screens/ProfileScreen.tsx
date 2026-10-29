@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { authApi } from '../api/api'
 import { useAuthStore } from '../store/authStore'
@@ -11,6 +12,7 @@ const ORANGE = '#f97316'
 export default function ProfileScreen() {
   const { user, shop, logout } = useAuthStore()
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
+  const { top } = useSafeAreaInsets()
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -36,7 +38,7 @@ export default function ProfileScreen() {
   ]
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: '#f9fafb' }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: '#f9fafb' }} contentContainerStyle={{ padding: 16, paddingTop: top + 8, paddingBottom: 40 }}>
       {/* Avatar card */}
       <View style={styles.avatarCard}>
         <View style={styles.avatar}>

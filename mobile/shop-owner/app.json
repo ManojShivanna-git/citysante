@@ -12,14 +12,21 @@
     },
     "android": {
       "package": "com.isanthe.shop",
-      "versionCode": 4,
+      "versionCode": 6,
       "googleServicesFile": "./google-services.json",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDomYDJ9arv0ZY4DM-CYChxPTmV82QgBBw"
+        }
+      },
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "icon": "./assets/icon.png"
     },
@@ -30,6 +37,12 @@
         "expo-camera",
         {
           "cameraPermission": "Allow Isanthe to scan product barcodes."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Isanthe to use your location to pin your shop on the map."
         }
       ]
     ],

@@ -97,13 +97,23 @@ export const productApi = {
   removeProduct:     (id: string) => api.delete(`/products/shop/${id}`),
   // Master catalog — browse + add
   getCatalog:        (params?: { search?: string; category_id?: string; page?: number }) =>
-    api.get('/products', { params: { limit: 30, ...params } }),
+    api.get('/products/catalog', { params: { limit: 30, ...params } }),
   getCategories:     () => api.get('/products/categories'),
   addFromCatalog:    (data: { product_id: string; price: number; discount_price?: number; stock_qty: number }) =>
     api.post('/products/shop', data),
   // Request new product to admin
-  requestNewProduct: (data: { name: string; description?: string; unit: string; brand?: string }) =>
-    api.post('/products/requests', data),
+  requestNewProduct: (data: { name: string; unit: string; description?: string; brand?: string; barcode?: string; image_url?: string }) =>
+    api.post('/products/request', data),
+  uploadImage: (localUri: string) => {
+    const form = new FormData()
+    const filename = localUri.split('/').pop() || 'image.jpg'
+    const match = /\.(\w+)$/.exec(filename)
+    const type = match ? `image/${match[1]}` : 'image/jpeg'
+    form.append('image', { uri: localUri, name: filename, type } as any)
+    return api.post('/products/upload-image', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
   // Barcode lookup via backend (avoids CORS)
   barcodeLookup: (barcode: string) => api.get(`/products/barcode-lookup?barcode=${barcode}`),
 }
@@ -116,6 +126,7 @@ export const riderApi = {
   getShopRiders:  () => api.get('/riders/shop/my'),
   lookupByPhone:  (phone: string) => api.get('/riders/lookup', { params: { phone } }),
   addRider:       (phone: string) => api.post('/riders/shop/add', { phone }),
+  removeRider:    (riderId: string) => api.delete(`/riders/shop/${riderId}`),
 }
 
 export const notificationApi = {

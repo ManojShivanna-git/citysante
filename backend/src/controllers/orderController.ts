@@ -396,7 +396,7 @@ export const rateOrder = async (req: AuthRequest, res: Response, next: NextFunct
 export const getShopOrders = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const shopId = req.user?.shopId
-    const { status, page = 1, limit = 20 } = req.query
+    const { status, page = 1, limit = 20, date_from, date_to } = req.query
     const offset = (Number(page) - 1) * Number(limit)
 
     const conditions = [`o.shop_id = $1`]
@@ -407,6 +407,16 @@ export const getShopOrders = async (req: AuthRequest, res: Response, next: NextF
       const statuses = (status as string).split(',').map((s) => s.trim())
       conditions.push(`o.status = ANY($${idx++}::order_status[])`)
       params.push(statuses)
+    }
+
+    if (date_from) {
+      conditions.push(`o.created_at >= $${idx++}`)
+      params.push(date_from)
+    }
+
+    if (date_to) {
+      conditions.push(`o.created_at < $${idx++}`)
+      params.push(date_to)
     }
 
     const countParams = [...params]

@@ -145,6 +145,14 @@ export const registerShop = async (req: AuthRequest, res: Response, next: NextFu
       zone_category = 'grocery',
     } = req.body
 
+    // Validate required fields
+    if (!name || !phone || !address || !city) {
+      throw createError('Name, phone, address and city are required', 400)
+    }
+    if (lat === undefined || lat === null || lng === undefined || lng === null) {
+      throw createError('Shop location (lat/lng) is required. Please use "Use My Location" to capture your GPS coordinates.', 400)
+    }
+
     // Check if owner already has a shop
     const existing = await query('SELECT id FROM shops WHERE owner_id = $1', [req.user?.userId])
     if (existing.rows.length > 0) {

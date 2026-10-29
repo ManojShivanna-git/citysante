@@ -14,6 +14,21 @@ const ZONE_CATEGORIES = [
   { value: 'dairy',     label: '🥛 Dairy & Bakery',       desc: 'Milk, eggs, bread, baked goods' },
 ]
 
+// ── Custom red shop marker icon ───────────────────────────────────────────
+function getShopIcon(G: any) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
+    <ellipse cx="20" cy="47" rx="8" ry="3" fill="rgba(0,0,0,0.2)"/>
+    <path d="M20 2 C10 2 4 10 4 18 C4 30 20 45 20 45 C20 45 36 30 36 18 C36 10 30 2 20 2Z" fill="#e53935" stroke="#fff" stroke-width="2"/>
+    <circle cx="20" cy="18" r="9" fill="#fff"/>
+    <text x="20" y="23" text-anchor="middle" font-size="12" fill="#e53935">🏪</text>
+  </svg>`
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new G.maps.Size(40, 50),
+    anchor: new G.maps.Point(20, 47),
+  }
+}
+
 // ── Dynamically load the Google Maps JS API ────────────────────────────────
 function loadGoogleMaps(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -101,19 +116,57 @@ export default function RegisterShopPage() {
           map,
           title: 'Your shop location',
           animation: G.maps.Animation.DROP,
+          icon: getShopIcon(G),
         })
       }
     })
 
-    // Try to center on user's current location
+    // Add "My Location" button
+    const locBtn = document.createElement('button')
+    locBtn.type = 'button'
+    locBtn.title = 'My location'
+    locBtn.innerHTML = '📍'
+    locBtn.style.cssText = 'margin:8px;width:40px;height:40px;background:#fff;border:none;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;'
+    locBtn.addEventListener('click', () => {
+      if (!navigator.geolocation) return
+      locBtn.innerHTML = '⏳'
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          map.setCenter(loc)
+          map.setZoom(17)
+          locBtn.innerHTML = '📍'
+        },
+        () => { locBtn.innerHTML = '📍' }
+      )
+    })
+    map.controls[G.maps.ControlPosition.LEFT_BOTTOM].push(locBtn)
+
+    // Auto-center and pin on user's current location on load
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
           map.setCenter(loc)
-          map.setZoom(16)
+          map.setZoom(17)
+          // Auto-place marker at current location
+          const latStr = pos.coords.latitude.toFixed(6)
+          const lngStr = pos.coords.longitude.toFixed(6)
+          set('lat', latStr)
+          set('lng', lngStr)
+          if (markerRef.current) {
+            markerRef.current.setPosition(loc)
+          } else {
+            markerRef.current = new G.maps.Marker({
+              position: loc,
+              map,
+              title: 'Your shop location',
+              animation: G.maps.Animation.DROP,
+              icon: getShopIcon(G),
+            })
+          }
         },
-        () => {} // silently ignore
+        () => {} // silently ignore if denied
       )
     }
   }, [step, mapsReady])

@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, RefreshControl, Switch, Alert,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { orderApi, shopApi } from '../api/api'
 import { useAuthStore } from '../store/authStore'
@@ -18,6 +19,7 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 export default function HomeScreen({ navigation }: any) {
+  const { top } = useSafeAreaInsets()
   const { user, shop, setShop } = useAuthStore()
   const [pendingOrders, setPending]   = useState<Order[]>([])
   const [stats, setStats]             = useState({ today: 0, revenue: 0, active: 0 })
@@ -27,10 +29,16 @@ export default function HomeScreen({ navigation }: any) {
 
   const load = async () => {
     try {
+      // Today's date range in ISO format (local midnight → next midnight)
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+      const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999)
+      const dateFrom   = todayStart.toISOString()
+      const dateTo     = todayEnd.toISOString()
+
       const [pendRes, activeRes, todayRes] = await Promise.all([
         orderApi.getShopOrders({ status: 'pending', limit: '5' }),
         orderApi.getShopOrders({ status: 'confirmed,packed,assigned,picked_up,out_for_delivery' }),
-        orderApi.getShopOrders({ status: 'delivered' }),
+        orderApi.getShopOrders({ status: 'delivered', date_from: dateFrom, date_to: dateTo, limit: '200' }),
       ])
       setPending(pendRes.data.data || [])
       const activeOrders = activeRes.data.data || []
@@ -58,14 +66,19 @@ export default function HomeScreen({ navigation }: any) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} colors={[ORANGE]} />}
     >
       {/* Header */}
-      <View style={styles.header}>
-        <View>
+      <View style={[styles.header, { paddingTop: top + 8 }]}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.greeting}>Good day, {user?.name?.split(' ')[0]} 👋</Text>
           <Text style={styles.shopName}>{shop?.name || 'My Shop'}</Text>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('Notifications')} style={styles.bellBtn}>
-          <Ionicons name="notifications-outline" size={24} color="#111" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          <TouchableOpacity onPress={() => navigation.navigate('Notifications')} style={styles.iconBtn}>
+            <Ionicons name="notifications-outline" size={22} color="#374151" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.iconBtn}>
+            <Ionicons name="settings-outline" size={22} color="#374151" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Shop open/close toggle */}
@@ -152,20 +165,20 @@ export default function HomeScreen({ navigation }: any) {
           {/* Quick actions */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.actionsRow}>
+            <View style={styles.actionsGrid}>
               {[
-                { label: 'All Orders', icon: 'list-outline',    screen: 'Orders'   },
-                { label: 'Products',   icon: 'cube-outline',    screen: 'Products' },
-                { label: 'Riders',     icon: 'bicycle-outline', screen: 'Riders'   },
-                { label: 'Profile',    icon: 'person-outline',  screen: 'Profile'  },
+                { label: 'All Orders', icon: 'list-outline',    screen: 'Orders',   color: '#3b82f6', params: { initialTab: 'pending,confirmed,packed,assigned,picked_up,out_for_delivery,delivered,cancelled' } },
+                { label: 'Products',   icon: 'cube-outline',    screen: 'Products', color: ORANGE,      params: undefined },
+                { label: 'Riders',     icon: 'bicycle-outline', screen: 'Riders',   color: '#8b5cf6',   params: undefined },
+                { label: 'Billing',    icon: 'wallet-outline',  screen: 'Billing',  color: '#22c55e',   params: undefined },
               ].map((a) => (
                 <TouchableOpacity
                   key={a.label}
                   style={styles.actionCard}
-                  onPress={() => navigation.navigate(a.screen)}
+                  onPress={() => navigation.navigate(a.screen, a.params)}
                 >
-                  <View style={styles.actionIcon}>
-                    <Ionicons name={a.icon as any} size={22} color={ORANGE} />
+                  <View style={[styles.actionIcon, { backgroundColor: a.color + '18' }]}>
+                    <Ionicons name={a.icon as any} size={24} color={a.color} />
                   </View>
                   <Text style={styles.actionLabel}>{a.label}</Text>
                 </TouchableOpacity>
@@ -179,10 +192,10 @@ export default function HomeScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+  header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8 },
   greeting:         { fontSize: 13, color: '#6b7280' },
   shopName:         { fontSize: 20, fontWeight: '800', color: '#111' },
-  bellBtn:          { padding: 8 },
+  iconBtn:          { padding: 8, backgroundColor: '#f3f4f6', borderRadius: 12 },
   shopToggleCard:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 16, marginVertical: 8, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#f3f4f6' },
   shopToggleLabel:  { fontSize: 13, color: '#6b7280', marginBottom: 2 },
   shopToggleStatus: { fontSize: 14, fontWeight: '600' },
@@ -203,8 +216,8 @@ const styles = StyleSheet.create({
   orderMeta:        { fontSize: 12, color: '#9ca3af' },
   badge:            { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   badgeText:        { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
-  actionsRow:       { flexDirection: 'row', gap: 10 },
-  actionCard:       { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 14, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#f3f4f6' },
-  actionIcon:       { width: 44, height: 44, borderRadius: 13, backgroundColor: '#fff7ed', alignItems: 'center', justifyContent: 'center' },
-  actionLabel:      { fontSize: 11, fontWeight: '600', color: '#374151' },
+  actionsGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  actionCard:       { width: '47%', backgroundColor: '#fff', borderRadius: 16, padding: 16, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#f3f4f6' },
+  actionIcon:       { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  actionLabel:      { fontSize: 13, fontWeight: '700', color: '#374151' },
 })
