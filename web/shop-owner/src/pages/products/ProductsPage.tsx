@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Search, Plus, Edit2, Trash2, Package, X, Send, ImagePlus, Barcode, Loader2 } from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, Package, X, Send, ImagePlus, Barcode, Loader2, Check } from 'lucide-react'
 import api, { productApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
 import type { ShopProduct, CatalogProduct, Category } from '../../types'
@@ -19,6 +19,11 @@ export default function ProductsPage() {
   const [editing, setEditing]     = useState<ShopProduct | null>(null)
   const [editForm, setEditForm]   = useState({ stock_qty: '', price: '', discount_price: '', is_available: true })
   const [addForm, setAddForm]     = useState({ product_id: '', price: '', discount_price: '', stock_qty: '', low_stock_alert: '10' })
+
+  // ── Inline stock editing ───────────────────────────────────────────────
+  const [inlineStock, setInlineStock] = useState<{ id: string; value: string } | null>(null)
+  const [inlineStockSaving, setInlineStockSaving] = useState(false)
+  const inlineStockRef = useRef<HTMLInputElement>(null)
 
   // ── Add from Catalog tab state ─────────────────────────────────────────
   const [catalogQuery, setCatalogQuery]         = useState('')
@@ -87,6 +92,25 @@ export default function ProductsPage() {
       setTimeout(() => barcodeInputRef.current?.focus(), 100)
     }
   }, [activeTab])
+
+  const handleInlineStockSave = async (productId: string, value: string) => {
+    const qty = parseInt(value)
+    if (isNaN(qty) || qty < 0) { toast.error('Enter a valid number'); return }
+    setInlineStockSaving(true)
+    try {
+      await productApi.updateStock(productId, { stock_qty: qty })
+      setProducts((prev) => prev.map((p) => p.id === productId
+        ? { ...p, stock_qty: qty, is_available: qty > 0 ? p.is_available : false }
+        : p
+      ))
+      setInlineStock(null)
+      toast.success('Stock updated')
+    } catch {
+      toast.error('Could not update stock')
+    } finally {
+      setInlineStockSaving(false)
+    }
+  }
 
   const handleUpdateStock = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -262,13 +286,53 @@ export default function ProductsPage() {
                       <td className="px-4 py-3 font-semibold">₹{p.price}</td>
                       <td className="px-4 py-3 text-gray-500">{p.discount_price ? `₹${p.discount_price}` : '—'}</td>
                       <td className="px-4 py-3">
-                        <span className={clsx(
-                          'font-medium',
-                          p.stock_qty === 0 ? 'text-red-600' :
-                          p.stock_qty <= p.low_stock_alert ? 'text-yellow-600' : 'text-gray-900'
-                        )}>
-                          {p.stock_qty}
-                        </span>
+                        {inlineStock?.id === p.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              ref={inlineStockRef}
+                              type="number"
+                              className="w-20 border border-brand-400 rounded-lg px-2 py-1 text-sm font-semibold text-center focus:outline-none focus:ring-2 focus:ring-brand-400"
+                              value={inlineStock.value}
+                              onChange={(e) => setInlineStock({ id: p.id, value: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleInlineStockSave(p.id, inlineStock.value)
+                                if (e.key === 'Escape') setInlineStock(null)
+                              }}
+                              autoFocus
+                              min={0}
+                            />
+                            <button
+                              onClick={() => handleInlineStockSave(p.id, inlineStock.value)}
+                              disabled={inlineStockSaving}
+                              className="p-1 text-green-600 hover:bg-green-50 rounded"
+                              title="Save"
+                            >
+                              {inlineStockSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                            </button>
+                            <button
+                              onClick={() => setInlineStock(null)}
+                              className="p-1 text-gray-400 hover:bg-gray-100 rounded"
+                              title="Cancel"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setInlineStock({ id: p.id, value: String(p.stock_qty) })}
+                            title="Click to update stock"
+                            className={clsx(
+                              'font-semibold px-2 py-0.5 rounded-md border transition-colors hover:border-brand-400 hover:bg-brand-50',
+                              p.stock_qty === 0
+                                ? 'text-red-600 bg-red-50 border-red-200'
+                                : p.stock_qty <= p.low_stock_alert
+                                ? 'text-yellow-600 bg-yellow-50 border-yellow-200'
+                                : 'text-gray-800 bg-gray-50 border-gray-200'
+                            )}
+                          >
+                            {p.stock_qty === 0 ? 'OOS' : `${p.stock_qty} left`}
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className={p.is_available ? 'badge-green' : 'badge-red'}>
