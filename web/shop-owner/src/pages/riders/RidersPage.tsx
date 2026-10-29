@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, Trash2, Circle, Search, CheckCircle } from 'lucide-react'
+import { UserPlus, Trash2, Circle, Search, CheckCircle, Phone } from 'lucide-react'
 import { riderApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
 import type { Rider } from '../../types'
@@ -127,7 +127,15 @@ export default function RidersPage() {
                       <span className="font-medium">{rider.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{rider.phone}</td>
+                  <td className="px-4 py-3">
+                    <a
+                      href={`tel:${rider.phone}`}
+                      className="flex items-center gap-1.5 text-brand-600 hover:text-brand-700 font-medium"
+                    >
+                      <Phone size={13} />
+                      {rider.phone}
+                    </a>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Circle size={8} fill={rider.is_on_duty ? '#22c55e' : '#9ca3af'}

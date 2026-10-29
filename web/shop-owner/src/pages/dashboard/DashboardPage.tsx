@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ShoppingBag, Package, TrendingUp, AlertCircle, Star, Clock } from 'lucide-react'
+import { ShoppingBag, Package, TrendingUp, AlertCircle, Star, Clock, IndianRupee } from 'lucide-react'
 import { orderApi, productApi } from '../../services/api'
 import { useShopStore } from '../../store/shopStore'
 import OrdersChart from '../../components/OrdersChart'
@@ -23,23 +23,33 @@ export default function DashboardPage() {
   const [products, setProducts] = useState<ShopProduct[]>([])
   const [loading, setLoading]  = useState(true)
 
+  const [todayCount, setTodayCount] = useState(0)
+  const [todayRevenue, setTodayRevenue] = useState(0)
+
   useEffect(() => {
     if (!shop) return
+
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+    const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999)
+
     Promise.all([
       orderApi.getShopOrders({ status: 'pending,confirmed,packed,assigned,picked_up,out_for_delivery', limit: '5' }),
       productApi.getShopProducts(shop.id, { available_only: 'false' }),
+      orderApi.getShopOrders({ status: 'delivered', date_from: todayStart.toISOString(), date_to: todayEnd.toISOString(), limit: '500' }),
     ])
-      .then(([ord, prod]) => {
+      .then(([ord, prod, todayOrd]) => {
         setOrders(ord.data.data)
         setProducts(prod.data.data)
+        const todayList: Order[] = todayOrd.data.data || []
+        setTodayCount(todayList.length)
+        setTodayRevenue(todayList.reduce((s, o) => s + parseFloat(String(o.total_amount)), 0))
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [shop?.id])
 
-  const lowStock   = products.filter((p) => p.stock_qty > 0 && p.stock_qty <= p.low_stock_alert)
-  const outOfStock = products.filter((p) => p.stock_qty === 0)
-  const todayOrders = orders.length
+  const lowStock      = products.filter((p) => p.stock_qty > 0 && p.stock_qty <= p.low_stock_alert)
+  const outOfStock    = products.filter((p) => p.stock_qty === 0)
   const pendingOrders = orders.filter((o) => o.status === 'pending').length
 
   if (loading) return (
@@ -63,10 +73,10 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Active Orders',  value: todayOrders,           icon: ShoppingBag, color: 'bg-blue-50 text-blue-600'   },
-          { label: 'Pending',        value: pendingOrders,         icon: Clock,       color: 'bg-yellow-50 text-yellow-600' },
-          { label: 'Low Stock',      value: lowStock.length,       icon: AlertCircle, color: 'bg-orange-50 text-orange-600' },
-          { label: 'Out of Stock',   value: outOfStock.length,     icon: Package,     color: 'bg-red-50 text-red-600'       },
+          { label: "Today's Orders",   value: todayCount,                          icon: ShoppingBag,  color: 'bg-blue-50 text-blue-600'    },
+          { label: "Today's Revenue",  value: `₹${todayRevenue.toFixed(0)}`,       icon: IndianRupee,  color: 'bg-green-50 text-green-600'  },
+          { label: 'Pending',          value: pendingOrders,                       icon: Clock,        color: 'bg-yellow-50 text-yellow-600' },
+          { label: 'Out of Stock',     value: outOfStock.length,                   icon: Package,      color: 'bg-red-50 text-red-600'       },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="card p-5">
             <div className="flex items-center justify-between">
