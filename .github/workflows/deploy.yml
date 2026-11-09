@@ -33,10 +33,10 @@ jobs:
             if echo "$CHANGED" | grep -q "^backend/"; then
               echo "🔧 Building backend..."
               cd backend
-              if echo "$CHANGED" | grep -q "^backend/package"; then
+              if echo "$CHANGED" | grep -q "^backend/package" || [ ! -d "node_modules" ]; then
                 npm ci
               fi
-              npm run build
+              npx tsc
               npm prune --omit=dev
               pm2 restart isanthe-api
               cd ..
@@ -49,7 +49,7 @@ jobs:
             if echo "$CHANGED" | grep -q "^web/customer/"; then
               echo "🌐 Building customer web..."
               cd web/customer
-              if echo "$CHANGED" | grep -q "^web/customer/package"; then
+              if echo "$CHANGED" | grep -q "^web/customer/package" || [ ! -d "node_modules" ]; then
                 npm ci
               fi
               npm run build
@@ -63,7 +63,7 @@ jobs:
             if echo "$CHANGED" | grep -q "^web/shop-owner/"; then
               echo "🏪 Building shop-owner web..."
               cd web/shop-owner
-              if echo "$CHANGED" | grep -q "^web/shop-owner/package"; then
+              if echo "$CHANGED" | grep -q "^web/shop-owner/package" || [ ! -d "node_modules" ]; then
                 npm ci
               fi
               npm run build
@@ -77,7 +77,7 @@ jobs:
             if echo "$CHANGED" | grep -q "^web/admin/"; then
               echo "⚙️ Building admin panel..."
               cd web/admin
-              if echo "$CHANGED" | grep -q "^web/admin/package"; then
+              if echo "$CHANGED" | grep -q "^web/admin/package" || [ ! -d "node_modules" ]; then
                 npm ci
               fi
               npm run build
