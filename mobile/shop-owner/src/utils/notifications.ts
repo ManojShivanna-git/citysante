@@ -30,11 +30,29 @@ export async function registerForPushNotifications(): Promise<string | null> {
   if (finalStatus !== 'granted') return null
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Isanthe Shop',
+    // 'isanthe_orders' — new orders (must match channelId sent by backend)
+    await Notifications.setNotificationChannelAsync('isanthe_orders', {
+      name: 'New Orders',
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
+      vibrationPattern: [0, 300, 200, 300, 200, 300],
       lightColor: '#f97316',
+      sound: 'default',
+      enableLights: true,
+      enableVibrate: true,
+      showBadge: true,
+    })
+    // 'citysante_payments' — billing / payment alerts
+    await Notifications.setNotificationChannelAsync('citysante_payments', {
+      name: 'Billing Alerts',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#ef4444',
+      sound: 'default',
+    })
+    // keep 'default' as fallback
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'General',
+      importance: Notifications.AndroidImportance.DEFAULT,
       sound: 'default',
     })
   }

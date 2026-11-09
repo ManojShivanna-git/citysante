@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { Alert, Vibration } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import * as Notifications from 'expo-notifications'
 import { authApi } from './src/api/api'
@@ -31,7 +32,6 @@ export default function App() {
         const res  = await authApi.me()
         const user = res.data.data
         if (user.role !== 'rider') { await logout(); return }
-        // ✅ Restore isOnDuty from server — survives app restarts
         useAuthStore.setState({ user, isAuthenticated: true, isOnDuty: !!user.is_on_duty })
       } catch {
         await logout()
@@ -40,21 +40,42 @@ export default function App() {
     init()
   }, [])
 
-  // Register push notifications once authenticated
   useEffect(() => {
     if (!isAuthenticated) return
 
     registerForPushNotifications()
 
-    notificationListener.current = Notifications.addNotificationReceivedListener((_notification) => {
-      // Foreground banner handled by setNotificationHandler above
+    // ── Foreground: vibrate + alert popup for new delivery assignment ─────────
+    notificationListener.current = Notifications.addNotificationReceivedListener((n) => {
+      const data = n.request.content.data as any
+      if (data?.type === 'assigned') {
+        Vibration.vibrate([0, 400, 200, 400, 200, 400])
+        Alert.alert(
+          '📋 New Delivery!',
+          n.request.content.body || 'You have been assigned a new order.',
+          [
+            { text: 'View Order', onPress: () => navigationRef.current?.navigate('ActiveOrder') },
+            { text: 'OK' },
+          ],
+          { cancelable: false }
+        )
+      }
     })
 
+    // ── Background/killed tap → open active order ─────────────────────────────
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as any
-      // Navigate to active order screen when notification is tapped
-      if (data?.order_id && navigationRef.current) {
-        navigationRef.current.navigate('ActiveOrder')
+      if (data?.order_id || data?.type === 'assigned') {
+        setTimeout(() => navigationRef.current?.navigate('ActiveOrder'), 500)
+      }
+    })
+
+    // ── Cold start: app was killed, tapped notification to open ───────────────
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return
+      const data = response.notification.request.content.data as any
+      if (data?.order_id || data?.type === 'assigned') {
+        setTimeout(() => navigationRef.current?.navigate('ActiveOrder'), 1000)
       }
     })
 
