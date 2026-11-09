@@ -213,6 +213,16 @@ async function getUserToken(userId: string): Promise<string | null> {
   return res.rows[0]?.device_fcm_token || null
 }
 
+// Only returns token if the rider is currently on duty
+async function getRiderTokenIfOnDuty(riderId: string): Promise<string | null> {
+  const res = await query(
+    'SELECT u.device_fcm_token, sr.is_on_duty FROM users u JOIN shop_riders sr ON sr.rider_id = u.id WHERE u.id = $1 LIMIT 1',
+    [riderId]
+  )
+  if (!res.rows[0]?.is_on_duty) return null
+  return res.rows[0]?.device_fcm_token || null
+}
+
 // ─── Public notification functions ───────────────────────────────────────
 
 export async function notifyNewOrder(
@@ -289,10 +299,10 @@ export async function notifyOrderStatusChange(
       if (cToken) await sendToToken(cToken, ct, cb, data)
       await saveNotification(customer_id, ct, cb, status, id)
 
-      // Notify rider
+      // Notify rider — only if on duty
       if (rider_id) {
         const { title: rt, body: rb } = templates.rider_assigned(order_number, shop_name || 'the shop')
-        const rToken = await getUserToken(rider_id)
+        const rToken = await getRiderTokenIfOnDuty(rider_id)
         if (rToken) await sendToToken(rToken, rt, rb, data)
         await saveNotification(rider_id, rt, rb, status, id)
       }

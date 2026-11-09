@@ -46,9 +46,11 @@ export default function App() {
     registerForPushNotifications()
 
     // ── Foreground: vibrate + alert popup for new delivery assignment ─────────
+    // Only alert if rider is on duty (belt-and-suspenders check on mobile side)
     notificationListener.current = Notifications.addNotificationReceivedListener((n) => {
       const data = n.request.content.data as any
-      if (data?.type === 'assigned') {
+      const { isOnDuty } = useAuthStore.getState()
+      if (data?.type === 'assigned' && isOnDuty) {
         Vibration.vibrate([0, 400, 200, 400, 200, 400])
         Alert.alert(
           '📋 New Delivery!',
