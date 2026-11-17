@@ -123,6 +123,7 @@ export interface ProductRequest {
   image_url: string | null
   unit: string
   brand: string | null
+  barcode: string | null
   category_id: string | null
   status: 'pending' | 'approved' | 'rejected'
   created_at: string
