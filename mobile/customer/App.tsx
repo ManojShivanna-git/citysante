@@ -74,13 +74,17 @@ export default function App() {
       notifReceivedRef.current = Notifications.addNotificationReceivedListener(
         (_notification) => {}
       )
+    } catch {}
 
+    try {
       notifTapRef.current = Notifications.addNotificationResponseReceivedListener(
         (response) => {
           handleNotificationTap(response.notification.request.content.data)
         }
       )
+    } catch {}
 
+    try {
       Notifications.getLastNotificationResponseAsync().then((response) => {
         if (response) {
           setTimeout(() => {
@@ -88,7 +92,7 @@ export default function App() {
           }, 500)
         }
       }).catch(() => {})
-    } catch { /* not supported in Expo Go */ }
+    } catch {}
 
     return () => {
       notifReceivedRef.current?.remove()

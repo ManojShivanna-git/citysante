@@ -4,19 +4,6 @@ import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import { authApi } from '../api/api'
 
-// ─── Foreground notification appearance ──────────────────────────────────────
-try {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert:  true,
-      shouldShowBanner: true,
-      shouldShowList:   true,
-      shouldPlaySound:  true,
-      shouldSetBadge:   true,
-    }),
-  })
-} catch { /* not supported in Expo Go */ }
-
 // ─── Android notification channels ───────────────────────────────────────────
 // Android 8+ requires a channel. We create one per logical category so users
 // can disable e.g. promos without losing order updates in device settings.
