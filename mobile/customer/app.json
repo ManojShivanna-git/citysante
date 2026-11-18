@@ -40,6 +40,7 @@
     },
     "plugins": [
       "./plugins/withBuildConfig",
+      "./plugins/withPortraitOptional",
       [
         "expo-build-properties",
         {
