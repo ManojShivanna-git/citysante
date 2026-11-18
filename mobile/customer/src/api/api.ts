@@ -111,6 +111,7 @@ const DEFAULT_LNG = 77.6215
 
 export const shopApi = {
   getAll:        (params?: any) => api.get('/shops', { params: { lat: DEFAULT_LAT, lng: DEFAULT_LNG, radius: 50, ...params } }),
+  search:        (q: string, params?: any) => api.get('/shops', { params: { lat: DEFAULT_LAT, lng: DEFAULT_LNG, q, ...params } }),
   getById:       (id: string)   => api.get(`/shops/${id}`),
   getShopImages: (id: string)   => api.get(`/shops/${id}/images`),
 }
@@ -133,7 +134,7 @@ export const orderApi = {
   place:   (data: any)   => api.post('/orders', data),
   getAll:  (params?: any) => api.get('/orders/my', { params }),
   getById: (id: string)  => api.get(`/orders/${id}`),
-  cancel:  (id: string)  => api.patch(`/orders/${id}/cancel`),
+  cancel:  (id: string)  => api.patch(`/orders/${id}/status`, { status: 'cancelled' }),
   rate:    (id: string, data: {
     shop: { stars: number; comment?: string }
     rider?: { stars: number }

@@ -1,27 +1,30 @@
 import { useCallback, useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, Image, ImageBackground,
+  ActivityIndicator, RefreshControl, Image,
 } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
-import { shopApi, productApi, getImageUrl } from '../api/api'
+import { productApi, shopApi, orderApi, getImageUrl } from '../api/api'
 import { useAuthStore } from '../store/authStore'
 import { useCartStore } from '../store/cartStore'
 import { setMapPickCallback } from '../utils/mapPickCallback'
 import type { Shop } from '../types'
 import type { RootStackParamList } from '../navigation'
 import { RED, YELLOW } from '../theme'
+
+interface RecentItem {
+  shop_product_id: string
+  product_id:      string
+  product_name:    string
+  unit_price:      number
+  shop_id:         string
+  shop_name:       string
+  image_url:       string | null
+}
 type Nav = NativeStackNavigationProp<RootStackParamList>
 
-type ShopMode = 'fast' | 'cost' | 'list'
-
-const MODES: { key: ShopMode; label: string; icon: string; desc: string }[] = [
-  { key: 'fast', label: 'Fast Delivery', icon: 'bicycle',     desc: 'Nearest shops first' },
-  { key: 'cost', label: 'Low Cost',      icon: 'pricetag',    desc: 'Cheapest delivery first' },
-  { key: 'list', label: 'Browse Shops',  icon: 'list',        desc: 'Browse all shops' },
-]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +55,100 @@ function parseArea(address: string | undefined, city: string): string {
   return city
 }
 
+// ── Section Header ────────────────────────────────────────────────────────────
+
+function SectionHeader({ icon, iconBg, iconColor, title, sub }: {
+  icon: string; iconBg: string; iconColor: string; title: string; sub?: string
+}) {
+  return (
+    <View style={shStyles.row}>
+      <View style={[shStyles.iconBox, { backgroundColor: iconBg }]}>
+        <Ionicons name={icon as any} size={14} color={iconColor} />
+      </View>
+      <Text style={shStyles.title}>{title}</Text>
+      {sub ? <Text style={shStyles.sub}>{sub}</Text> : null}
+    </View>
+  )
+}
+const shStyles = StyleSheet.create({
+  row:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 12 },
+  iconBox: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  title:   { fontSize: 15, fontWeight: '800', color: '#111', flex: 1 },
+  sub:     { fontSize: 12, color: '#9ca3af', fontWeight: '500' },
+})
+
+// ── Shop Chip Card (horizontal scroll) ───────────────────────────────────────
+
+function ShopChipCard({ shop, onPress }: { shop: Shop; onPress: () => void }) {
+  const coverUri = isRealImage(shop.cover_url) ? getImageUrl(shop.cover_url) : null
+  const logoUri  = isRealImage(shop.logo_url)  ? getImageUrl(shop.logo_url)  : null
+
+  return (
+    <TouchableOpacity style={chipStyles.card} onPress={onPress} activeOpacity={0.86}>
+      {/* ── Cover strip ── */}
+      <View style={chipStyles.coverBox}>
+        {coverUri ? (
+          <Image source={{ uri: coverUri }} style={chipStyles.coverImg} resizeMode="cover" />
+        ) : (
+          <View style={chipStyles.coverFallback}>
+            <Text style={{ fontSize: 30 }}>🏪</Text>
+          </View>
+        )}
+        {!shop.is_open && <View style={chipStyles.closedDim} />}
+        {/* Open / Closed pill */}
+        <View style={[chipStyles.statusPill, { backgroundColor: shop.is_open ? '#16a34a' : '#374151' }]}>
+          <View style={[chipStyles.statusDot, { backgroundColor: shop.is_open ? '#bbf7d0' : '#9ca3af' }]} />
+          <Text style={chipStyles.statusText}>{shop.is_open ? 'Open' : 'Closed'}</Text>
+        </View>
+      </View>
+
+      {/* ── Info strip ── */}
+      <View style={chipStyles.infoBox}>
+        {/* Logo overlapping cover */}
+        {logoUri && (
+          <View style={chipStyles.logoBadge}>
+            <Image source={{ uri: logoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          </View>
+        )}
+        <Text style={chipStyles.name} numberOfLines={1}>{shop.name}</Text>
+        <View style={chipStyles.meta}>
+          <Ionicons name="star" size={10} color="#f59e0b" />
+          <Text style={chipStyles.rating}>{shop.rating ? parseFloat(String(shop.rating)).toFixed(1) : '—'}</Text>
+          {shop.delivery_time_min ? (
+            <>
+              <Text style={chipStyles.sep}>·</Text>
+              <Ionicons name="time-outline" size={10} color="#9ca3af" />
+              <Text style={chipStyles.metaText}>{shop.delivery_time_min}m</Text>
+            </>
+          ) : null}
+        </View>
+      </View>
+    </TouchableOpacity>
+  )
+}
+const chipStyles = StyleSheet.create({
+  card: {
+    width: 150, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
+    borderWidth: 1, borderColor: '#f0f0f4',
+  },
+  coverBox:     { width: '100%', height: 90, position: 'relative' },
+  coverImg:     { width: '100%', height: '100%' },
+  coverFallback:{ width: '100%', height: '100%', backgroundColor: '#fce7f3', alignItems: 'center', justifyContent: 'center' },
+  closedDim:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
+  statusPill:   { position: 'absolute', top: 7, right: 7, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
+  statusDot:    { width: 5, height: 5, borderRadius: 3 },
+  statusText:   { fontSize: 9, fontWeight: '800', color: '#fff' },
+  logoBadge:    { position: 'absolute', top: -32, left: 10, width: 64, height: 64, borderRadius: 14, overflow: 'hidden', borderWidth: 3, borderColor: '#fff', backgroundColor: '#fff' },
+  infoBox:      { paddingHorizontal: 10, paddingTop: 38, paddingBottom: 10 },
+  name:         { fontSize: 12, fontWeight: '800', color: '#111', marginBottom: 4 },
+  meta:         { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  rating:       { fontSize: 10, fontWeight: '700', color: '#92400e' },
+  sep:          { fontSize: 10, color: '#d1d5db' },
+  metaText:     { fontSize: 10, color: '#6b7280', fontWeight: '500' },
+})
+
 // ── Shop Card ─────────────────────────────────────────────────────────────────
 
 function ShopCard({ shop, onPress }: { shop: Shop; onPress: () => void }) {
@@ -64,8 +161,8 @@ function ShopCard({ shop, onPress }: { shop: Shop; onPress: () => void }) {
       {/* Left: cover image */}
       <View style={styles.shopCover}>
         {coverUri
-          ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-          : <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' }]}>
+          ? <Image source={{ uri: coverUri }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
+          : <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 30 }}>🏪</Text>
             </View>
         }
@@ -129,11 +226,32 @@ function ShopCard({ shop, onPress }: { shop: Shop; onPress: () => void }) {
 // ── Product Card ───────────────────────────────────────────────────────────────
 
 function ProductCard({ item, onPress }: { item: any; onPress: () => void }) {
-  const { addItem } = useCartStore()
+  const { addItem, updateQty, removeItem, getItemQty } = useCartStore()
   const imgUrl  = isRealImage(item.image_url) ? getImageUrl(item.image_url) : null
   const price   = item.effective_price ?? item.discount_price ?? item.price
   const original = (item.discount_price && item.discount_price < item.price) ? item.price : null
   const savings  = original ? Math.round(original - price) : 0
+  const qty = getItemQty(item.shop_id, item.id)
+
+  const handleAdd = () => addItem({
+    shop_product_id: item.id,
+    product_id:      item.product_id,
+    name:            item.product_name,
+    price:           item.price,
+    discount_price:  item.discount_price ?? null,
+    image_url:       item.image_url,
+    unit:            item.unit,
+    unit_value:      item.unit_value,
+    shop_id:         item.shop_id,
+    shop_name:       item.shop_name,
+    quantity:        1,
+  })
+
+  const handleIncrease = () => updateQty(item.shop_id, item.id, qty + 1)
+  const handleDecrease = () => {
+    if (qty <= 1) removeItem(item.shop_id, item.id)
+    else updateQty(item.shop_id, item.id, qty - 1)
+  }
 
   return (
     <TouchableOpacity style={styles.productCard} onPress={onPress} activeOpacity={0.85}>
@@ -141,7 +259,9 @@ function ProductCard({ item, onPress }: { item: any; onPress: () => void }) {
       <View style={styles.productImgBox}>
         {imgUrl
           ? <Image source={{ uri: imgUrl }} style={styles.productImg} resizeMode="contain" />
-          : <Text style={{ fontSize: 30 }}>{catEmoji(item.category_name)}</Text>
+          : <View style={styles.productImgPlaceholder}>
+              <Text style={{ fontSize: 26 }}>{catEmoji(item.category_name)}</Text>
+            </View>
         }
         {savings > 0 && (
           <View style={styles.savingsBadge}>
@@ -160,28 +280,28 @@ function ProductCard({ item, onPress }: { item: any; onPress: () => void }) {
           </View>
           {original && <Text style={styles.productOriginal}>₹{original}</Text>}
         </View>
-        <Text style={styles.productShop} numberOfLines={1}>🏪 {item.shop_name}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
+          <Ionicons name="storefront-outline" size={10} color="#9ca3af" />
+          <Text style={styles.productShop} numberOfLines={1}>{item.shop_name}</Text>
+        </View>
       </View>
 
-      {/* ADD */}
-      <TouchableOpacity
-        style={styles.addBtn}
-        onPress={() => addItem({
-          shop_product_id: item.id,
-          product_id:      item.product_id,
-          name:            item.product_name,
-          price:           item.price,
-          discount_price:  item.discount_price ?? null,
-          image_url:       item.image_url,
-          unit:            item.unit,
-          unit_value:      item.unit_value,
-          shop_id:         item.shop_id,
-          shop_name:       item.shop_name,
-          quantity:        1,
-        })}
-      >
-        <Text style={styles.addBtnText}>ADD</Text>
-      </TouchableOpacity>
+      {/* ADD / QTY control */}
+      {qty === 0 ? (
+        <TouchableOpacity style={styles.addBtn} onPress={handleAdd}>
+          <Text style={styles.addBtnText}>ADD</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.qtyControl}>
+          <TouchableOpacity style={styles.qtyBtn} onPress={handleDecrease}>
+            <Text style={styles.qtyBtnText}>−</Text>
+          </TouchableOpacity>
+          <Text style={styles.qtyCount}>{qty}</Text>
+          <TouchableOpacity style={styles.qtyBtn} onPress={handleIncrease}>
+            <Text style={styles.qtyBtnText}>+</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </TouchableOpacity>
   )
 }
@@ -191,15 +311,17 @@ export default function HomeScreen() {
   const { user }   = useAuthStore()
   const itemCount  = useCartStore((s) => s.totalItems())
   const cartCount  = useCartStore((s) => s.carts.length)
+  const { addItem, getItemQty } = useCartStore()
 
-  const [shops, setShops]         = useState<Shop[]>([])
   const [products, setProducts]   = useState<any[]>([])
+  const [shops, setShops]         = useState<Shop[]>([])
   const [loading, setLoading]     = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [mode, setMode]           = useState<ShopMode>('fast')
   const [coords, setCoords]       = useState<{ lat: number; lng: number } | null>(null)
   const [locLabel, setLocLabel]   = useState<string>('')
   const [locError, setLocError]   = useState(false)
+  const [recentItems, setRecentItems]   = useState<RecentItem[]>([])
+  const [orderedShops, setOrderedShops] = useState<Shop[]>([])
 
   // ── Open location picker ─────────────────────────────────────────────────
   const openLocationPicker = () => {
@@ -243,38 +365,77 @@ export default function HomeScreen() {
     requestLocation()
   }, [])
 
+  // ── Fetch recent orders + compute most-ordered shop ─────────────────────────
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await orderApi.getAll({ limit: 40 })
+        const orders: any[] = res.data.data || []
+        const delivered = orders.filter((o) => o.status === 'delivered')
+
+        // Flatten items → recently ordered products
+        const seen = new Set<string>()
+        const items: RecentItem[] = []
+        for (const order of delivered) {
+          for (const item of (order.items ?? [])) {
+            if (!seen.has(item.product_id)) {
+              seen.add(item.product_id)
+              items.push({
+                shop_product_id: item.shop_product_id ?? '',
+                product_id:      item.product_id ?? '',
+                product_name:    item.product_name,
+                unit_price:      item.unit_price,
+                shop_id:         order.shop_id,
+                shop_name:       order.shop_name,
+                image_url:       item.product_image ?? null,
+              })
+            }
+          }
+        }
+        setRecentItems(items)
+
+        // Count orders per shop → sort by most ordered
+        const shopCount: Record<string, number> = {}
+        for (const order of delivered) {
+          if (order.shop_id) shopCount[order.shop_id] = (shopCount[order.shop_id] || 0) + 1
+        }
+        const sortedShopIds = Object.entries(shopCount)
+          .sort((a, b) => b[1] - a[1])
+          .map(([id]) => id)
+
+        if (sortedShopIds.length > 0) {
+          try {
+            const shopDetails = await Promise.allSettled(
+              sortedShopIds.map((id) => shopApi.getById(id))
+            )
+            const fetchedShops: Shop[] = shopDetails
+              .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+              .map((r) => r.value.data.data)
+              .filter(Boolean)
+            setOrderedShops(fetchedShops)
+          } catch {}
+        }
+      } catch {}
+    })()
+  }, [])
+
   // ── Fetch data ───────────────────────────────────────────────────────────────
   const fetchData = async () => {
     if (!coords) { setLoading(false); setRefreshing(false); return }
-    const loc = coords
     try {
-      if (mode === 'list') {
-        const res = await shopApi.getAll({ lat: loc.lat, lng: loc.lng, mode })
-        const raw = res.data.data?.shops || res.data.data || []
-        const parsed = raw.map((s: any) => ({
-          ...s,
-          badges: Array.isArray(s.badges)
-            ? s.badges
-            : typeof s.badges === 'string'
-              ? s.badges.replace(/^\{|\}$/g, '').split(',').filter(Boolean)
-              : [],
-        }))
-        setShops(parsed)
-        setProducts([])
-      } else {
-        const res = await productApi.browse(loc.lat, loc.lng, { mode: mode === 'fast' ? 'fast' : 'cost', limit: 40 })
-        const raw = res.data.data || []
-        setProducts(raw)
-        setShops([])
-      }
+      const [prodRes, shopsRes] = await Promise.allSettled([
+        productApi.browse(coords.lat, coords.lng, { mode: 'fast', limit: 40 }),
+        shopApi.getAll({ lat: coords.lat, lng: coords.lng, mode: 'fast', limit: 10 }),
+      ])
+      if (prodRes.status === 'fulfilled') setProducts(prodRes.value.data.data || [])
+      if (shopsRes.status === 'fulfilled') setShops(shopsRes.value.data.data?.shops || [])
     } catch {}
     finally { setLoading(false); setRefreshing(false) }
   }
 
-  useFocusEffect(useCallback(() => { fetchData() }, [mode, coords]))
+  useFocusEffect(useCallback(() => { fetchData() }, [coords]))
 
   const onRefresh = () => { setRefreshing(true); fetchData() }
-  const activeMode = MODES.find((m) => m.key === mode)!
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
@@ -282,155 +443,181 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={RED} colors={[RED]} />
         }
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
         {/* ══════════════════════════════════════════════
-            HERO — single red zone with depth & circles
+            HERO — greeting + location + search
            ══════════════════════════════════════════════ */}
         <View style={styles.hero}>
-          {/* Decorative translucent circles (large → small depth effect) */}
           <View style={styles.circle1} />
           <View style={styles.circle2} />
           <View style={styles.circle3} />
           <View style={styles.circle4} />
 
-          {/* Top row: greeting + cart */}
+          {/* Greeting + profile */}
           <View style={styles.heroTop}>
             <View style={{ flex: 1 }}>
               <Text style={styles.greeting}>Hi, {user?.name?.split(' ')[0] ?? 'there'} 👋</Text>
               <TouchableOpacity style={styles.locRow} onPress={openLocationPicker}>
-                <Ionicons
-                  name={coords ? 'location' : 'location-outline'}
-                  size={13}
-                  color={coords ? YELLOW : 'rgba(255,255,255,0.55)'}
-                />
-                <Text style={[styles.locText, !coords && { color: 'rgba(255,255,255,0.55)' }]} numberOfLines={1}>
+                <Ionicons name={coords ? 'location' : 'location-outline'} size={13}
+                  color={coords ? YELLOW : 'rgba(255,255,255,0.6)'} />
+                <Text style={[styles.locText, !coords && { color: 'rgba(255,255,255,0.6)' }]} numberOfLines={1}>
                   {locLabel || (locError ? 'Tap to set location' : 'Getting location…')}
                 </Text>
                 <Ionicons name="chevron-down" size={11} color="rgba(255,255,255,0.5)" />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.cartBtn} onPress={() => navigation.navigate('Cart')}>
-              <Ionicons name="cart-outline" size={22} color="#fff" />
-              {itemCount > 0 && (
-                <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>{itemCount}</Text>
-                </View>
-              )}
+            <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Profile')}>
+              <Ionicons name="person-outline" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
 
-          {/* Brand row */}
-          <View style={styles.brandRow}>
-            <View style={styles.logoBox}>
-              <Text style={{ fontSize: 22 }}>🛒</Text>
-            </View>
-            <View>
-              <Text style={styles.wordmark}>
-                Isan<Text style={{ color: YELLOW }}>the</Text>
-              </Text>
-              <Text style={styles.tagline}>Fresh · Fast · Nearby</Text>
-            </View>
-          </View>
+          {/* Search bar in hero */}
+          <TouchableOpacity style={styles.heroSearch} onPress={() => navigation.navigate('Search')} activeOpacity={0.9}>
+            <Ionicons name="search-outline" size={18} color="#9ca3af" />
+            <Text style={styles.heroSearchText}>Search products, brands, shops…</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ══════════════════════════════════════════════
-            CONTENT — white card emerges from hero
+            CONTENT
            ══════════════════════════════════════════════ */}
         <View style={styles.contentCard}>
-          {/* ── Location prompt (when no location set) ── */}
+
+          {/* Location prompt */}
           {!coords && (
             <TouchableOpacity style={styles.locationPrompt} onPress={openLocationPicker} activeOpacity={0.85}>
-              <View style={styles.locationPromptIcon}>
-                <Ionicons name="location-outline" size={22} color={RED} />
-              </View>
+              <Ionicons name="location-outline" size={18} color={RED} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.locationPromptTitle}>Where should we deliver?</Text>
+                <Text style={styles.locationPromptTitle}>Set delivery location</Text>
                 <Text style={styles.locationPromptSub}>
-                  {locError ? 'Location access denied — tap to set manually' : 'Set your delivery location to see nearby shops'}
+                  {locError ? 'Location denied — tap to set manually' : 'See shops near you'}
                 </Text>
               </View>
-              <View style={styles.locationPromptBtn}>
-                <Text style={styles.locationPromptBtnText}>Set</Text>
-              </View>
+              <View style={styles.locationPromptBtn}><Text style={styles.locationPromptBtnText}>Set</Text></View>
             </TouchableOpacity>
           )}
 
-          {/* Search bar */}
-          <TouchableOpacity
-            style={styles.searchBar}
-            onPress={() => navigation.navigate('MainTabs', { screen: 'Search' } as any)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.searchIconBox}>
-              <Ionicons name="search" size={16} color="#fff" />
+          {/* Recently Ordered */}
+          {recentItems.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader icon="time-outline" iconBg="#fef2f2" iconColor={RED} title="Recently Ordered" />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 4 }}>
+                {recentItems.map((item, idx) => {
+                  const qty = item.shop_product_id ? getItemQty(item.shop_id, item.shop_product_id) : 0
+                  const handleAdd = () => {
+                    if (!item.shop_product_id) {
+                      navigation.navigate('Shop', { shopId: item.shop_id, shopName: item.shop_name })
+                      return
+                    }
+                    addItem({
+                      shop_product_id: item.shop_product_id,
+                      product_id:      item.product_id,
+                      name:            item.product_name,
+                      price:           item.unit_price,
+                      discount_price:  null,
+                      unit:            '',
+                      unit_value:      '',
+                      quantity:        1,
+                      shop_id:         item.shop_id,
+                      shop_name:       item.shop_name,
+                      image_url:       item.image_url,
+                    })
+                  }
+                  return (
+                    <View key={`${item.product_id}-${idx}`} style={styles.recentCard}>
+                      {/* Top area — tap to go to shop */}
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate('Shop', { shopId: item.shop_id, shopName: item.shop_name })}
+                        activeOpacity={0.82}
+                      >
+                        <View style={styles.recentImgBox}>
+                          {item.image_url ? (
+                            <Image source={{ uri: getImageUrl(item.image_url) }} style={{ width: 56, height: 56, borderRadius: 14 }} resizeMode="cover" />
+                          ) : (
+                            <Text style={{ fontSize: 24 }}>{catEmoji(item.product_name)}</Text>
+                          )}
+                        </View>
+                        <Text style={styles.recentName} numberOfLines={2}>{item.product_name}</Text>
+                        <Text style={styles.recentShop} numberOfLines={1}>{item.shop_name}</Text>
+                      </TouchableOpacity>
+                      {/* Footer — ADD / qty always gets its own touch */}
+                      <View style={styles.recentFooter}>
+                        <Text style={styles.recentPrice}>₹{Number(item.unit_price).toFixed(0)}</Text>
+                        {qty === 0 ? (
+                          <TouchableOpacity style={styles.recentAddBtn} onPress={handleAdd}>
+                            <Text style={styles.recentAddBtnText}>ADD</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={styles.recentQty}>
+                            <TouchableOpacity onPress={() => useCartStore.getState().updateQty(item.shop_id, item.shop_product_id, qty - 1)}>
+                              <Ionicons name="remove" size={12} color={RED} />
+                            </TouchableOpacity>
+                            <Text style={styles.recentQtyText}>{qty}</Text>
+                            <TouchableOpacity onPress={handleAdd}>
+                              <Ionicons name="add" size={12} color={RED} />
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  )
+                })}
+              </ScrollView>
             </View>
-            <Text style={styles.searchPlaceholder}>Search products across shops...</Text>
-            <Ionicons name="mic-outline" size={18} color="#d1d5db" />
-          </TouchableOpacity>
+          )}
 
-          {/* Shopping mode toggle */}
-          <View style={styles.modeContainer}>
-            <View style={styles.modeRow}>
-              {MODES.map((m) => (
-                <TouchableOpacity
-                  key={m.key}
-                  style={[styles.modeChip, mode === m.key && styles.modeChipActive]}
-                  onPress={() => setMode(m.key)}
-                >
-                  <Ionicons
-                    name={m.icon as any}
-                    size={15}
-                    color={mode === m.key ? '#fff' : '#6b7280'}
-                  />
-                  <Text style={[styles.modeChipText, mode === m.key && styles.modeChipTextActive]}>
-                    {m.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {/* Order Again */}
+          {orderedShops.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader icon="refresh-outline" iconBg="#f0fdf4" iconColor="#16a34a"
+                title="Order Again" sub="Your shops" />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 4 }}>
+                {orderedShops.map((shop) => (
+                  <ShopChipCard key={shop.id} shop={shop}
+                    onPress={() => navigation.navigate('Shop', { shopId: shop.id, shopName: shop.name })} />
+                ))}
+              </ScrollView>
             </View>
-            <Text style={styles.modeDesc}>{activeMode.desc}</Text>
-          </View>
+          )}
 
-          {/* Section title */}
-          <Text style={styles.sectionTitle}>
-            {mode === 'list' ? 'Shops Near You' : mode === 'fast' ? '⚡ Fast Delivery Products' : '💰 Best Prices Near You'}
-          </Text>
+          {/* Nearby Shops */}
+          {shops.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader icon="storefront-outline" iconBg="#eff6ff" iconColor="#3b82f6"
+                title="Nearby Shops" sub={`${shops.length} near you`} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 4 }}>
+                {shops.map((shop) => (
+                  <ShopChipCard key={shop.id} shop={shop}
+                    onPress={() => navigation.navigate('Shop', { shopId: shop.id, shopName: shop.name })} />
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
-          {loading ? (
-            <View style={styles.center}><ActivityIndicator color={RED} size="large" /></View>
-          ) : mode === 'list' ? (
-            shops.length === 0 ? (
-              <View style={styles.center}>
-                <Ionicons name="storefront-outline" size={48} color="#d1d5db" />
-                <Text style={styles.emptyText}>No shops available</Text>
-              </View>
-            ) : (
-              shops.map((shop) => (
-                <ShopCard
-                  key={shop.id}
-                  shop={shop}
-                  onPress={() => navigation.navigate('Shop', { shopId: shop.id, shopName: shop.name })}
-                />
-              ))
-            )
-          ) : (
-            products.length === 0 ? (
+          {/* Products */}
+          <View style={styles.productsBlock}>
+            <SectionHeader icon="flash-outline" iconBg="#fff7ed" iconColor="#f97316"
+              title="Near You" sub="Nearest first" />
+            {loading ? (
+              <View style={styles.center}><ActivityIndicator color={RED} size="large" /></View>
+            ) : products.length === 0 ? (
               <View style={styles.center}>
                 <Ionicons name="basket-outline" size={48} color="#d1d5db" />
                 <Text style={styles.emptyText}>No products available</Text>
               </View>
             ) : (
               products.map((p) => (
-                <ProductCard
-                  key={p.id}
-                  item={p}
-                  onPress={() => navigation.navigate('Shop', { shopId: p.shop_id, shopName: p.shop_name })}
-                />
+                <ProductCard key={p.id} item={p}
+                  onPress={() => navigation.navigate('Shop', { shopId: p.shop_id, shopName: p.shop_name })} />
               ))
-            )
-          )}
+            )}
+          </View>
+
         </View>
       </ScrollView>
 
@@ -457,145 +644,98 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: RED,
     overflow: 'hidden',
-    paddingBottom: 58,
+    paddingBottom: 20,
   },
 
-  // Decorative translucent circles (Swiggy/Blinkit style — large & impactful)
-  circle1: {
-    position: 'absolute',
-    width: 280, height: 280, borderRadius: 140,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    top: -90, right: -70,
-  },
-  circle2: {
-    position: 'absolute',
-    width: 180, height: 180, borderRadius: 90,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    top: 44, right: 88,
-  },
-  circle3: {
-    position: 'absolute',
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    bottom: 44, left: 12,
-  },
-  circle4: {
-    position: 'absolute',
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    bottom: 18, right: 36,
-  },
+  circle1: { position: 'absolute', width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(255,255,255,0.07)', top: -90, right: -70 },
+  circle2: { position: 'absolute', width: 180, height: 180, borderRadius: 90,  backgroundColor: 'rgba(255,255,255,0.05)', top: 40,  right: 80  },
+  circle3: { position: 'absolute', width: 100, height: 100, borderRadius: 50,  backgroundColor: 'rgba(255,255,255,0.06)', bottom: 20, left: 10  },
+  circle4: { position: 'absolute', width: 56,  height: 56,  borderRadius: 28,  backgroundColor: 'rgba(255,255,255,0.09)', bottom: 12, right: 32 },
 
-  // Hero top row
   heroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 20,
-    paddingTop: 56,
-    paddingBottom: 18,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    paddingHorizontal: 20, paddingTop: 52, paddingBottom: 14,
   },
-  greeting: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  greeting: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 3 },
   locRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  locText:  { fontSize: 12, color: 'rgba(255,255,255,0.75)', flex: 1 },
+  locText:  { fontSize: 12, color: 'rgba(255,255,255,0.78)', flex: 1 },
 
-  // Cart button — circular with frosted look
-  cartBtn: {
-    width: 42, height: 42, borderRadius: 14,
+  profileBtn: {
+    width: 40, height: 40, borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
   },
-  cartBadge: {
-    position: 'absolute', top: -5, right: -5,
-    width: 18, height: 18, borderRadius: 9,
-    backgroundColor: YELLOW,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: RED,
-  },
-  cartBadgeText: { color: '#111', fontSize: 10, fontWeight: '800' },
 
-  // Brand row
-  brandRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 20, paddingBottom: 4,
-  },
-  logoBox: {
-    width: 46, height: 46, borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  wordmark: { fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
-  tagline:  { fontSize: 12, color: 'rgba(255,255,255,0.72)', fontWeight: '500', marginTop: 1 },
-
-  // ── Content card (emerges from hero — Swiggy-style deep curve) ───────────
-  contentCard: {
-    backgroundColor: '#f9fafb',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    marginTop: -44,
-    paddingTop: 24,
-    // Subtle shadow on the top edge to reinforce the "floating card" feel on iOS
-    shadowColor: '#000',
-    shadowOpacity: 0.10,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: -6 },
-  },
-
-  // Location prompt banner
-  locationPrompt: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    marginHorizontal: 16, marginBottom: 16,
-    padding: 14, borderRadius: 16,
-    backgroundColor: '#fff1f2',
-    borderWidth: 1.5, borderColor: '#fecaca',
-    borderStyle: 'dashed',
-  },
-  locationPromptIcon: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center',
-  },
-  locationPromptTitle: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 2 },
-  locationPromptSub:   { fontSize: 12, color: '#6b7280', lineHeight: 16 },
-  locationPromptBtn: {
-    backgroundColor: RED, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
-  },
-  locationPromptBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-
-  // Search bar
-  searchBar: {
+  // Search bar inside hero
+  heroSearch: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginHorizontal: 16, marginBottom: 16,
-    paddingVertical: 13, paddingHorizontal: 14,
+    marginHorizontal: 16,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1, borderColor: '#e5e7eb',
-    shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 }, elevation: 3,
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13,
+    shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 10, elevation: 6,
   },
-  searchIconBox: {
-    width: 32, height: 32, borderRadius: 10,
-    backgroundColor: RED,
+  heroSearchText: { flex: 1, fontSize: 14, color: '#9ca3af' },
+
+  // ── Content card ─────────────────────────────────────────────────────────
+  contentCard: {
+    backgroundColor: '#f5f6fa',
+    paddingTop: 16,
+  },
+
+  // Location prompt
+  locationPrompt: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 16, marginBottom: 14,
+    padding: 12, borderRadius: 14,
+    backgroundColor: '#fff1f2', borderWidth: 1, borderColor: '#fecaca',
+  },
+  locationPromptTitle: { fontSize: 13, fontWeight: '700', color: '#111', marginBottom: 1 },
+  locationPromptSub:   { fontSize: 11, color: '#9ca3af' },
+  locationPromptBtn:   { backgroundColor: RED, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9 },
+  locationPromptBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+
+  // ── Sections ──────────────────────────────────────────────────────────────
+  section: {
+    backgroundColor: '#fff',
+    marginBottom: 10,
+    paddingTop: 16, paddingBottom: 16,
+  },
+  productsBlock: {
+    backgroundColor: '#fff',
+    paddingTop: 16, paddingBottom: 8,
+  },
+
+  // Recently ordered strip
+  recentCard: {
+    width: 114,
+    backgroundColor: '#fff', borderRadius: 16, padding: 10,
+    borderWidth: 1, borderColor: '#f0f0f4',
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+  },
+  recentImgBox: {
+    width: 56, height: 56, borderRadius: 14,
+    backgroundColor: '#fef2f2',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 8, alignSelf: 'center',
+  },
+  recentName:  { fontSize: 11, fontWeight: '700', color: '#111', lineHeight: 15, marginBottom: 2 },
+  recentShop:  { fontSize: 10, color: '#9ca3af', marginBottom: 6 },
+  recentFooter:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' as any },
+  recentPrice: { fontSize: 12, fontWeight: '800', color: RED },
+  recentAddBtn: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 7,
+    borderWidth: 1.5, borderColor: RED,
     alignItems: 'center', justifyContent: 'center',
   },
-  searchPlaceholder: { flex: 1, fontSize: 14, color: '#9ca3af' },
-
-  // ── Mode toggle ───────────────────────────────────────────────────────────
-  modeContainer: { marginHorizontal: 16, marginBottom: 4 },
-  modeRow:       { flexDirection: 'row', gap: 8, marginBottom: 6 },
-  modeChip: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, paddingVertical: 9, paddingHorizontal: 6,
-    borderRadius: 12, backgroundColor: '#fff',
-    borderWidth: 1.5, borderColor: '#e5e7eb',
+  recentAddBtnText: { fontSize: 11, fontWeight: '800', color: RED, letterSpacing: 0.5 },
+  recentQty: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1.5, borderColor: RED, borderRadius: 7,
+    paddingHorizontal: 4, paddingVertical: 2,
   },
-  modeChipActive:     { backgroundColor: RED, borderColor: RED },
-  modeChipText:       { fontSize: 12, fontWeight: '600', color: '#6b7280' },
-  modeChipTextActive: { color: '#fff' },
-  modeDesc:           { fontSize: 12, color: '#9ca3af', textAlign: 'center', marginBottom: 8 },
-
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#374151', marginLeft: 16, marginBottom: 8 },
+  recentQtyText: { fontSize: 11, fontWeight: '800', color: '#111', minWidth: 12, textAlign: 'center' },
 
   // ── Shop cards ────────────────────────────────────────────────────────────
   shopCard: {
@@ -610,7 +750,7 @@ const styles = StyleSheet.create({
     width: 100, position: 'relative',
   },
   shopCoverClosed: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center', justifyContent: 'center',
   },
@@ -632,8 +772,8 @@ const styles = StyleSheet.create({
   openPillText: { fontSize: 10, fontWeight: '700' },
   shopFooter:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   shopMin:      { fontSize: 11, color: '#9ca3af' },
-  shopBadge:    { backgroundColor: '#fff7ed', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  shopBadgeText:{ fontSize: 10, fontWeight: '700', color: '#ea580c' },
+  shopBadge:    { backgroundColor: '#fef2f2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  shopBadgeText:{ fontSize: 10, fontWeight: '700', color: RED },
 
   center:    { padding: 40, alignItems: 'center' },
   emptyText: { fontSize: 15, color: '#9ca3af', marginTop: 12 },
@@ -647,11 +787,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 }, elevation: 2,
   },
   productImgBox: {
-    width: 72, height: 72, borderRadius: 12,
-    backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center',
+    width: 72, height: 72, borderRadius: 14,
+    backgroundColor: '#fef2f2', alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden', position: 'relative',
   },
-  productImg:      { width: 72, height: 72 },
+  productImg:          { width: 72, height: 72 },
+  productImgPlaceholder: {
+    width: 72, height: 72, borderRadius: 14,
+    backgroundColor: '#fef2f2',
+    alignItems: 'center', justifyContent: 'center',
+  },
   savingsBadge: {
     position: 'absolute', top: 0, left: 0,
     backgroundColor: '#16a34a', borderRadius: 4,
@@ -662,13 +807,24 @@ const styles = StyleSheet.create({
   productShop:     { fontSize: 10, color: '#9ca3af', marginTop: 3 },
   productUnit:     { fontSize: 11, color: '#6b7280', marginTop: 1 },
   productOriginal: { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through' },
-  priceTag:        { backgroundColor: '#16a34a', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  priceTag:        { backgroundColor: RED, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
   priceTagText:    { color: '#fff', fontSize: 13, fontWeight: '800' },
   addBtn: {
     borderWidth: 1.5, borderColor: RED, borderRadius: 10,
     paddingHorizontal: 14, paddingVertical: 7, marginLeft: 8,
   },
   addBtnText: { color: RED, fontWeight: '800', fontSize: 12 },
+  qtyControl: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: RED, borderRadius: 10,
+    marginLeft: 8, backgroundColor: '#fff',
+  },
+  qtyBtn: {
+    paddingHorizontal: 10, paddingVertical: 7,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  qtyBtnText: { color: RED, fontWeight: '800', fontSize: 17, lineHeight: 18 },
+  qtyCount:   { paddingHorizontal: 8, fontWeight: '800', fontSize: 13, color: '#111', minWidth: 20, textAlign: 'center' },
 
   // ── Floating cart bar ─────────────────────────────────────────────────────
   cartBar: {

@@ -8,11 +8,12 @@ import { uploadToCloudinary } from '../middleware/upload'
 
 export const getNearbyShops = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { lat, lng, mode = 'fast', radius = 10, page = 1, limit = 20 } = req.query
+    const { lat, lng, mode = 'fast', radius = 10, page = 1, limit = 20, q = '' } = req.query
 
     if (!lat || !lng) throw createError('Location (lat, lng) is required', 400)
 
     const offset = (Number(page) - 1) * Number(limit)
+    const searchTerm = String(q).trim().toLowerCase()
 
     // Sort by mode
     const orderBy = mode === 'fast' ? 'distance ASC' :
@@ -27,35 +28,40 @@ export const getNearbyShops = async (req: Request, res: Response, next: NextFunc
         sin(radians($1)) * sin(radians(s.lat))
       ))`
 
+    // When q is provided, skip the radius filter and search by name only
+    const whereClause = searchTerm
+      ? `WHERE s.status = 'active' AND s.lat IS NOT NULL AND LOWER(s.name) ILIKE '%' || $3 || '%'`
+      : `WHERE s.status = 'active' AND s.lat IS NOT NULL AND ${haversine} <= $3`
+
+    const mainParams = searchTerm
+      ? [lat, lng, searchTerm, limit, offset]
+      : [lat, lng, radius, limit, offset]
+
     const result = await query(
       `SELECT
         s.id, s.name, s.description, s.logo_url, s.cover_url,
         s.city, s.address, s.delivery_fee, s.minimum_order, s.delivery_time_min,
         s.delivery_time_max, s.rating, s.total_reviews, s.is_open,
         s.zone_id, s.zone_category,
-        ARRAY_AGG(DISTINCT sb.badge) FILTER (WHERE sb.is_active = TRUE) AS badges,
-        ${haversine} AS distance
+        ARRAY_AGG(DISTINCT sb.badge) FILTER (WHERE sb.is_active = TRUE) AS badges
+        ${searchTerm ? '' : `, ${haversine} AS distance`}
       FROM shops s
       LEFT JOIN shop_badges sb ON sb.shop_id = s.id
-      WHERE s.status = 'active'
-        AND s.lat IS NOT NULL
-        AND ${haversine} <= $3
+      ${whereClause}
       GROUP BY s.id
-      ORDER BY ${orderBy}
+      ORDER BY ${searchTerm ? 's.rating DESC' : orderBy}
       LIMIT $4 OFFSET $5`,
-      [lat, lng, radius, limit, offset]
+      mainParams
     )
 
+    const countParams = searchTerm ? [lat, lng, searchTerm] : [lat, lng, radius]
+    const countWhere = searchTerm
+      ? `WHERE s.status = 'active' AND s.lat IS NOT NULL AND LOWER(s.name) ILIKE '%' || $3 || '%'`
+      : `WHERE s.status = 'active' AND s.lat IS NOT NULL AND (6371 * acos(cos(radians($1)) * cos(radians(s.lat)) * cos(radians(s.lng) - radians($2)) + sin(radians($1)) * sin(radians(s.lat)))) <= $3`
+
     const countResult = await query(
-      `SELECT COUNT(*) FROM shops s
-       WHERE s.status = 'active'
-         AND s.lat IS NOT NULL
-         AND (6371 * acos(
-           cos(radians($1)) * cos(radians(s.lat)) *
-           cos(radians(s.lng) - radians($2)) +
-           sin(radians($1)) * sin(radians(s.lat))
-         )) <= $3`,
-      [lat, lng, radius]
+      `SELECT COUNT(*) FROM shops s ${countWhere}`,
+      countParams
     )
 
     res.json({

@@ -101,6 +101,8 @@ export interface Order {
   special_instructions: string | null
   created_at: string
   shop_name: string
+  shop_logo?: string | null
+  shop_cover?: string | null
   shop_address: string
   shop_phone?: string | null
   delivery_address: string | Record<string, string>

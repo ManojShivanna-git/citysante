@@ -118,8 +118,8 @@ export default function ShopScreen() {
           onPress={() => coverUri && setLightboxUri(coverUri)}
         >
           {coverUri
-            ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-            : <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#ef4444' }]} />
+            ? <Image source={{ uri: coverUri }} style={styles.absoluteFill} resizeMode="cover" />
+            : <View style={[styles.absoluteFill, { backgroundColor: RED }]} />
           }
           <View style={styles.coverOverlay} />
           {coverUri && (
@@ -302,8 +302,9 @@ const styles = StyleSheet.create({
   // ── Shop header ──────────────────────────────────────────────────────────
   shopHeader: { backgroundColor: '#fff', marginBottom: 4 },
   coverBox: { height: 130, overflow: 'hidden', position: 'relative' },
+  absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   coverOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.2)',
   },
   coverHint: {

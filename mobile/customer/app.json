@@ -7,7 +7,7 @@
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.isanthe.customer",
-      "versionCode": 6,
+      "versionCode": 7,
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "permissions": [

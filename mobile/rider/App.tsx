@@ -8,15 +8,17 @@ import { registerForPushNotifications } from './src/utils/notifications'
 import Navigation from './src/navigation'
 
 // Show banners even when app is foregrounded
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert:  true,
-    shouldShowBanner: true,
-    shouldShowList:   true,
-    shouldPlaySound:  true,
-    shouldSetBadge:   true,
-  }),
-})
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert:  true,
+      shouldShowBanner: true,
+      shouldShowList:   true,
+      shouldPlaySound:  true,
+      shouldSetBadge:   true,
+    }),
+  })
+} catch { /* Expo Go does not support this — safe to ignore */ }
 
 export default function App() {
   const { loadToken, logout, isAuthenticated } = useAuthStore()
@@ -43,43 +45,44 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return
 
-    registerForPushNotifications()
+    registerForPushNotifications().catch(() => {})
 
-    // ── Foreground: vibrate + alert popup for new delivery assignment ─────────
-    // Only alert if rider is on duty (belt-and-suspenders check on mobile side)
-    notificationListener.current = Notifications.addNotificationReceivedListener((n) => {
-      const data = n.request.content.data as any
-      const { isOnDuty } = useAuthStore.getState()
-      if (data?.type === 'assigned' && isOnDuty) {
-        Vibration.vibrate([0, 400, 200, 400, 200, 400])
-        Alert.alert(
-          '📋 New Delivery!',
-          n.request.content.body || 'You have been assigned a new order.',
-          [
-            { text: 'View Order', onPress: () => navigationRef.current?.navigate('ActiveOrder') },
-            { text: 'OK' },
-          ],
-          { cancelable: false }
-        )
-      }
-    })
+    try {
+      // ── Foreground: vibrate + alert popup for new delivery assignment ───────
+      notificationListener.current = Notifications.addNotificationReceivedListener((n) => {
+        const data = n.request.content.data as any
+        const { isOnDuty } = useAuthStore.getState()
+        if (data?.type === 'assigned' && isOnDuty) {
+          Vibration.vibrate([0, 400, 200, 400, 200, 400])
+          Alert.alert(
+            '📋 New Delivery!',
+            n.request.content.body || 'You have been assigned a new order.',
+            [
+              { text: 'View Order', onPress: () => navigationRef.current?.navigate('ActiveOrder') },
+              { text: 'OK' },
+            ],
+            { cancelable: false }
+          )
+        }
+      })
 
-    // ── Background/killed tap → open active order ─────────────────────────────
-    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as any
-      if (data?.order_id || data?.type === 'assigned') {
-        setTimeout(() => navigationRef.current?.navigate('ActiveOrder'), 500)
-      }
-    })
+      // ── Background/killed tap → open active order ───────────────────────────
+      responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data as any
+        if (data?.order_id || data?.type === 'assigned') {
+          setTimeout(() => navigationRef.current?.navigate('ActiveOrder'), 500)
+        }
+      })
 
-    // ── Cold start: app was killed, tapped notification to open ───────────────
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (!response) return
-      const data = response.notification.request.content.data as any
-      if (data?.order_id || data?.type === 'assigned') {
-        setTimeout(() => navigationRef.current?.navigate('ActiveOrder'), 1000)
-      }
-    })
+      // ── Cold start: app was killed, tapped notification to open ─────────────
+      Notifications.getLastNotificationResponseAsync().then((response) => {
+        if (!response) return
+        const data = response.notification.request.content.data as any
+        if (data?.order_id || data?.type === 'assigned') {
+          setTimeout(() => navigationRef.current?.navigate('ActiveOrder'), 1000)
+        }
+      }).catch(() => {})
+    } catch { /* Expo Go does not support notification listeners */ }
 
     return () => {
       notificationListener.current?.remove()

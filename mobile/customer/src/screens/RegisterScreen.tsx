@@ -8,9 +8,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import * as SecureStore from 'expo-secure-store'
 import { authApi } from '../api/api'
 import { useAuthStore } from '../store/authStore'
-import type { AuthStackParamList } from '../navigation'
+import type { RootStackParamList } from '../navigation'
 import { RED, YELLOW } from '../theme'
-type Nav = NativeStackNavigationProp<AuthStackParamList>
+type Nav = NativeStackNavigationProp<RootStackParamList>
 
 export default function RegisterScreen() {
   const navigation = useNavigation<Nav>()

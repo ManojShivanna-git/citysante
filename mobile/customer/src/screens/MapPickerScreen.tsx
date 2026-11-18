@@ -14,10 +14,37 @@ import {
   ActivityIndicator, Platform, TextInput, FlatList,
   Keyboard, Alert,
 } from 'react-native'
-import MapView, { Region, PROVIDER_GOOGLE } from 'react-native-maps'
 import * as Location from 'expo-location'
+import { NativeModules, UIManager } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
+
+// Detect map support: check UIManager for the actual view registration, not just the native module.
+// NativeModules.AIRMapModule can exist in Expo Go SDK 58+ even though the view isn't registered.
+function checkMapsSupported(): boolean {
+  try {
+    const cfg = (UIManager as any).getViewManagerConfig
+    if (cfg) {
+      return !!(cfg('AIRMap') || cfg('RNMapsAirMap'))
+    }
+    // Fallback for older RN versions
+    return !!(NativeModules.AIRMapModule || NativeModules.RNMapsAirModule)
+  } catch {
+    return false
+  }
+}
+const mapsSupported = checkMapsSupported()
+let MapView: any = null
+let PROVIDER_GOOGLE: any = null
+if (mapsSupported) {
+  try {
+    const maps = require('react-native-maps')
+    MapView = maps.default
+    PROVIDER_GOOGLE = maps.PROVIDER_GOOGLE
+  } catch {
+    // require failed — treat as unsupported
+  }
+}
 import { callMapPickCallback, type MapPickResult } from '../utils/mapPickCallback'
 import { RED } from '../theme'
 
@@ -26,6 +53,11 @@ const GMAPS_KEY = 'AIzaSyDomYDJ9arv0ZY4DM-CYChxPTmV82QgBBw'
 const DEFAULT_REGION: Region = {
   latitude: 12.9716, longitude: 77.5946,
   latitudeDelta: 0.01, longitudeDelta: 0.01,
+}
+
+interface Region {
+  latitude: number; longitude: number;
+  latitudeDelta: number; longitudeDelta: number;
 }
 
 interface Suggestion {
@@ -54,11 +86,28 @@ function parseComponents(comps: any[]): ParsedAddress {
 
 // ── Reverse geocode via REST ──────────────────────────────────────────────────
 async function reverseGeocode(lat: number, lng: number): Promise<ParsedAddress | null> {
+  // 1. Try Google Geocoding REST API first
   try {
     const res  = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GMAPS_KEY}`)
     const json = await res.json()
     if (json.status === 'OK' && json.results?.length) return parseComponents(json.results[0].address_components)
   } catch {}
+
+  // 2. Fallback: expo-location native reverse geocoding (works without API key)
+  try {
+    const [place] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng })
+    if (place) {
+      const street = [place.streetNumber, place.street, place.district || place.subregion]
+        .filter(Boolean).join(', ') || place.name || 'Current location'
+      return {
+        street:  street,
+        city:    place.city || place.region || '',
+        state:   place.region || '',
+        pincode: place.postalCode || '',
+      }
+    }
+  } catch {}
+
   return null
 }
 
@@ -95,9 +144,76 @@ async function getPlaceDetails(placeId: string): Promise<{ lat: number; lng: num
   return null
 }
 
+// ── Expo Go fallback (map not supported) ─────────────────────────────────────
+function ExpoGoFallback() {
+  const navigation = useNavigation()
+  const [query, setQuery] = useState('')
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+
+  const handleSearch = async (text: string) => {
+    setQuery(text)
+    if (!text.trim()) { setSuggestions([]); return }
+    const results = await getPlaceSuggestions(text)
+    setSuggestions(results)
+  }
+
+  const selectSuggestion = async (s: Suggestion) => {
+    Keyboard.dismiss()
+    setQuery(s.main_text)
+    setSuggestions([])
+    const details = await getPlaceDetails(s.place_id)
+    if (details) {
+      callMapPickCallback({
+        street:  details.parsed.street || s.main_text,
+        city:    details.parsed.city   || '',
+        state:   details.parsed.state  || '',
+        pincode: details.parsed.pincode || '',
+        lat:     details.lat,
+        lng:     details.lng,
+      })
+      navigation.goBack()
+    }
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#f9fafb', padding: 16 }}>
+      <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 16, color: '#111' }}>Pick Delivery Location</Text>
+      <View style={styles.searchBar}>
+        <Ionicons name="search-outline" size={19} color="#9ca3af" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search area, street or landmark…"
+          placeholderTextColor="#9ca3af"
+          value={query}
+          onChangeText={handleSearch}
+          autoFocus
+        />
+      </View>
+      {suggestions.map((s, i) => (
+        <TouchableOpacity
+          key={s.place_id}
+          style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', backgroundColor: '#fff' }}
+          onPress={() => selectSuggestion(s)}
+        >
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#111' }}>{s.main_text}</Text>
+          {!!s.secondary_text && <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{s.secondary_text}</Text>}
+        </TouchableOpacity>
+      ))}
+      <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 24, textAlign: 'center' }}>
+        Map view not available in Expo Go — use search above
+      </Text>
+    </View>
+  )
+}
+
 export default function MapPickerScreen() {
   const navigation = useNavigation()
-  const mapRef     = useRef<MapView>(null)
+
+  // react-native-maps not available (Expo Go) — show search-only fallback
+  if (!mapsSupported) {
+    return <ExpoGoFallback />
+  }
+  const mapRef     = useRef<any>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [region,        setRegion]        = useState<Region>(DEFAULT_REGION)
@@ -236,9 +352,9 @@ export default function MapPickerScreen() {
 
   // ── Confirm ───────────────────────────────────────────────────────────────
   const handleConfirm = () => {
-    if (!parsed?.street || !parsed?.city) return
+    if (!parsed) return
     callMapPickCallback({
-      street:  parsed.street,
+      street:  parsed.street  || parsed.city || 'Current location',
       city:    parsed.city    || 'Unknown City',
       state:   parsed.state   || 'Karnataka',
       pincode: parsed.pincode || '000000',
@@ -249,7 +365,7 @@ export default function MapPickerScreen() {
   }
 
   const isReady   = !!parsed && !geocoding && !dragging
-  const hasStreet = !!(parsed?.street && parsed?.city)
+  const hasStreet = !!(parsed?.street || parsed?.city)
 
   return (
     <View style={styles.container}>
@@ -258,7 +374,7 @@ export default function MapPickerScreen() {
       {mapsReady && (
         <MapView
           ref={mapRef}
-          style={StyleSheet.absoluteFillObject}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
           initialRegion={region}
           onRegionChange={handleRegionChange}
@@ -267,15 +383,19 @@ export default function MapPickerScreen() {
         />
       )}
 
-      {/* ── Fixed centre pin (balloon style) ───────────────────── */}
+      {/* ── Fixed centre pin (ring-dot on stick) ───────────────── */}
       <View style={styles.pinWrapper} pointerEvents="none">
         <View style={[styles.pinGroup, dragging && styles.pinGroupUp]}>
-          {/* Balloon circle */}
-          <View style={styles.pinBalloon}>
-            <Ionicons name="home" size={22} color="#fff" />
+          {/* Outer ring */}
+          <View style={styles.pinRing}>
+            {/* Inner white circle */}
+            <View style={styles.pinInner}>
+              {/* Centre dot */}
+              <View style={styles.pinDot} />
+            </View>
           </View>
-          {/* Triangle tip */}
-          <View style={styles.pinTip} />
+          {/* Stick */}
+          <View style={styles.pinStick} />
         </View>
         {/* Ground shadow */}
         <View style={[styles.pinShadow, dragging && styles.pinShadowLarge]} />
@@ -390,24 +510,31 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 160,
     alignItems: 'center', justifyContent: 'center',
   },
-  pinGroup:    { alignItems: 'center' },
-  pinGroupUp:  { transform: [{ translateY: -14 }] },
-  pinBalloon: {
-    width: 54, height: 54, borderRadius: 27,
+  pinGroup:   { alignItems: 'center' },
+  pinGroupUp: { transform: [{ translateY: -14 }] },
+  pinRing: {
+    width: 46, height: 46, borderRadius: 23,
     backgroundColor: RED,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 3, borderColor: '#fff',
-    shadowColor: RED, shadowOpacity: 0.45, shadowRadius: 10,
-    elevation: 10,
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8,
+    elevation: 8,
   },
-  pinTip: {
-    width: 0, height: 0,
-    borderLeftWidth: 11, borderRightWidth: 11, borderTopWidth: 20,
-    borderLeftColor: 'transparent', borderRightColor: 'transparent',
-    borderTopColor: RED,
-    marginTop: -3,
+  pinInner: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
   },
-  pinShadow:      { width: 14, height: 6, borderRadius: 7, backgroundColor: 'rgba(0,0,0,0.20)', marginTop: 2 },
+  pinDot: {
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: RED,
+  },
+  pinStick: {
+    width: 3, height: 24,
+    backgroundColor: RED,
+    borderBottomLeftRadius: 2, borderBottomRightRadius: 2,
+  },
+  pinShadow:      { width: 12, height: 5, borderRadius: 6, backgroundColor: 'rgba(0,0,0,0.22)', marginTop: 1 },
   pinShadowLarge: { transform: [{ scaleX: 1.6 }], opacity: 0.3 },
 
   // Top overlay

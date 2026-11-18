@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   splitNoticeText: { flex: 1, fontSize: 13, color: '#1d4ed8', lineHeight: 18 },
 
   shopSection:  { marginBottom: 16 },
-  shopHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff7ed', padding: 12, borderRadius: 12, marginBottom: 8 },
+  shopHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fef2f2', padding: 12, borderRadius: 12, marginBottom: 8 },
   shopName:     { flex: 1, fontSize: 14, fontWeight: '700', color: '#111' },
   clearText:    { fontSize: 13, color: '#ef4444', fontWeight: '600' },
 

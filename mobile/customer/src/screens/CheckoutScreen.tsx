@@ -13,7 +13,7 @@ import type { RootStackParamList } from '../navigation'
 import { setMapPickCallback, type MapPickResult } from '../utils/mapPickCallback'
 import { RED } from '../theme'
 
-const ORANGE = RED   // alias so all existing style refs stay valid
+const ORANGE = RED
 type Nav = NativeStackNavigationProp<RootStackParamList>
 
 export default function CheckoutScreen() {
@@ -100,7 +100,7 @@ export default function CheckoutScreen() {
         [
           {
             text: 'Track Orders', onPress: () => {
-              navigation.reset({ index: 0, routes: [{ name: 'MainTabs', params: { screen: 'Orders' } }] })
+              navigation.reset({ index: 0, routes: [{ name: 'Home' }, { name: 'Orders' }] })
             }
           },
         ]
@@ -297,13 +297,13 @@ const styles = StyleSheet.create({
   shopSummaryTotalLabel: { fontSize: 13, fontWeight: '700', color: '#374151' },
   shopSummaryTotalAmt:   { fontSize: 13, fontWeight: '700', color: '#111' },
 
-  grandTotal:      { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff7ed', padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#fed7aa' },
+  grandTotal:      { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fef2f2', padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#fecaca' },
   grandTotalLabel: { fontSize: 15, fontWeight: '800', color: '#111' },
-  grandTotalAmt:   { fontSize: 15, fontWeight: '800', color: ORANGE },
+  grandTotalAmt:   { fontSize: 15, fontWeight: '800', color: RED },
 
   notesInput:  { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, fontSize: 14, color: '#111', minHeight: 80, textAlignVertical: 'top' },
 
   btnWrap:      { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: 'rgba(249,250,251,0.97)', borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  placeBtn:     { backgroundColor: ORANGE, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  placeBtn:     { backgroundColor: RED, borderRadius: 14, paddingVertical: 16, alignItems: 'center', shadowColor: RED, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   placeBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 })

@@ -222,9 +222,10 @@ export const getMyOrders = async (req: AuthRequest, res: Response, next: NextFun
     const [result, countResult] = await Promise.all([
       query(
         `SELECT o.*,
-          s.name AS shop_name, s.logo_url AS shop_logo,
+          s.name AS shop_name, s.logo_url AS shop_logo, s.cover_url AS shop_cover,
           json_agg(json_build_object(
-            'id', oi.id, 'product_name', oi.product_name,
+            'id', oi.id, 'shop_product_id', oi.shop_product_id,
+            'product_id', oi.product_id, 'product_name', oi.product_name,
             'quantity', oi.quantity, 'unit_price', oi.unit_price,
             'subtotal', oi.subtotal, 'product_image', oi.product_image
           )) AS items
@@ -232,7 +233,7 @@ export const getMyOrders = async (req: AuthRequest, res: Response, next: NextFun
          JOIN shops s ON s.id = o.shop_id
          JOIN order_items oi ON oi.order_id = o.id
          WHERE ${conditions.join(' AND ')}
-         GROUP BY o.id, s.name, s.logo_url
+         GROUP BY o.id, s.name, s.logo_url, s.cover_url
          ORDER BY o.created_at DESC
          LIMIT $${idx++} OFFSET $${idx}`,
         params

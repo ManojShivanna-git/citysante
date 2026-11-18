@@ -5,6 +5,11 @@ import { useShopStore } from '../../store/shopStore'
 import toast from 'react-hot-toast'
 
 const API = (import.meta.env.VITE_API_URL || '/api').replace(/\/api$/, '')
+function imgUrl(url?: string | null) {
+  if (!url) return undefined
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  return `${API}${url}`
+}
 
 export default function SettingsPage() {
   const { shop, setShop } = useShopStore()
@@ -133,7 +138,7 @@ export default function SettingsPage() {
         <div
           className="relative h-36 bg-gradient-to-r from-brand-500 to-brand-700 cursor-pointer group"
           style={shop?.cover_url ? {
-            backgroundImage: `url(${API}${shop.cover_url})`,
+            backgroundImage: `url(${imgUrl(shop.cover_url)})`,
             backgroundSize: 'cover', backgroundPosition: 'center',
           } : {}}
           onClick={() => coverRef.current?.click()}
@@ -155,7 +160,7 @@ export default function SettingsPage() {
             onClick={() => logoRef.current?.click()}
           >
             {shop?.logo_url
-              ? <img src={`${API}${shop.logo_url}`} alt="Logo" className="w-full h-full object-cover" />
+              ? <img src={imgUrl(shop.logo_url)} alt="Logo" className="w-full h-full object-cover" />
               : <Store size={28} className="text-brand-400" />}
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
               <div className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -301,7 +306,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
               {galleryImgs.map((img) => (
                 <div key={img.id} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-100">
-                  <img src={`${API}${img.image_url}`} alt="" className="w-full h-full object-cover" />
+                  <img src={imgUrl(img.image_url)} alt="" className="w-full h-full object-cover" />
                   <button type="button"
                     onClick={() => handleGalleryDelete(img.id)}
                     className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">

@@ -13,15 +13,17 @@ import Navigation from './src/navigation'
 import type { RootStackParamList } from './src/navigation'
 
 // ── Foreground notification appearance ───────────────────────────────────────
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert:  true,
-    shouldShowBanner: true,
-    shouldShowList:   true,
-    shouldPlaySound:  true,
-    shouldSetBadge:   true,
-  }),
-})
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert:  true,
+      shouldShowBanner: true,
+      shouldShowList:   true,
+      shouldPlaySound:  true,
+      shouldSetBadge:   true,
+    }),
+  })
+} catch { /* not supported in Expo Go */ }
 
 // ── Typed navigation ref — shared with Navigation so we can navigate from
 //    outside React (e.g. notification tap handler, background push)
@@ -66,34 +68,27 @@ export default function App() {
     if (!isAuthenticated) return
 
     // Register this device and save the token to the backend
-    registerForPushNotifications()
+    registerForPushNotifications().catch(() => {})
 
-    // ── 1. Foreground: banner shown automatically by setNotificationHandler.
-    //       We optionally handle extra logic here (e.g. in-app badge update).
-    notifReceivedRef.current = Notifications.addNotificationReceivedListener(
-      (_notification) => {
-        // Notification banner appears automatically.
-        // You can inspect _notification.request.content.data here for custom logic.
-      }
-    )
+    try {
+      notifReceivedRef.current = Notifications.addNotificationReceivedListener(
+        (_notification) => {}
+      )
 
-    // ── 2. Tap while app is OPEN or in BACKGROUND ─────────────────────────
-    notifTapRef.current = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        handleNotificationTap(response.notification.request.content.data)
-      }
-    )
-
-    // ── 3. Tap while app was KILLED (cold start) ───────────────────────────
-    //       The listener above fires too late here — must check manually.
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) {
-        // Small delay so the NavigationContainer has time to mount
-        setTimeout(() => {
+      notifTapRef.current = Notifications.addNotificationResponseReceivedListener(
+        (response) => {
           handleNotificationTap(response.notification.request.content.data)
-        }, 500)
-      }
-    })
+        }
+      )
+
+      Notifications.getLastNotificationResponseAsync().then((response) => {
+        if (response) {
+          setTimeout(() => {
+            handleNotificationTap(response.notification.request.content.data)
+          }, 500)
+        }
+      }).catch(() => {})
+    } catch { /* not supported in Expo Go */ }
 
     return () => {
       notifReceivedRef.current?.remove()
