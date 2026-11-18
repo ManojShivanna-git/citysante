@@ -44,10 +44,7 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true,
-            "buildFeatures": {
-              "buildConfig": true
-            }
+            "usesCleartextTraffic": true
           }
         }
       ],
