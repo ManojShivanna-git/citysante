@@ -39,6 +39,7 @@
       "androidCollapsedTitle": "Isanthe"
     },
     "plugins": [
+      "./plugins/withBuildConfig",
       [
         "expo-build-properties",
         {
