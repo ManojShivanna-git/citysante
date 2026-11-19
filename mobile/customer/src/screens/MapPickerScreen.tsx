@@ -15,35 +15,26 @@ import {
   Keyboard, Alert,
 } from 'react-native'
 import * as Location from 'expo-location'
-import { NativeModules, UIManager } from 'react-native'
+import { NativeModules } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 
-// Detect map support: check UIManager for the actual view registration, not just the native module.
-// NativeModules.AIRMapModule can exist in Expo Go SDK 58+ even though the view isn't registered.
-function checkMapsSupported(): boolean {
-  try {
-    const cfg = (UIManager as any).getViewManagerConfig
-    if (cfg) {
-      return !!(cfg('AIRMap') || cfg('RNMapsAirMap'))
-    }
-    // Fallback for older RN versions
-    return !!(NativeModules.AIRMapModule || NativeModules.RNMapsAirModule)
-  } catch {
-    return false
-  }
-}
-const mapsSupported = checkMapsSupported()
+// Try to load react-native-maps. If the native module isn't registered
+// (Expo Go) the require succeeds but MapView won't render — we detect
+// that by checking for the AIRMap native module after the require.
 let MapView: any = null
 let PROVIDER_GOOGLE: any = null
-if (mapsSupported) {
-  try {
-    const maps = require('react-native-maps')
+let mapsSupported = false
+try {
+  const maps = require('react-native-maps')
+  // Only mark as supported if the native module is actually registered
+  if (NativeModules.AIRMapModule || NativeModules.RNMapsAirModule) {
     MapView = maps.default
     PROVIDER_GOOGLE = maps.PROVIDER_GOOGLE
-  } catch {
-    // require failed — treat as unsupported
+    mapsSupported = true
   }
+} catch {
+  // react-native-maps not available
 }
 import { callMapPickCallback, type MapPickResult } from '../utils/mapPickCallback'
 import { RED } from '../theme'
